@@ -25,3 +25,10 @@ And visit [localhost:8123](http://localhost:8123/) to see your current Library. 
 ## License
 
 MIT
+
+- How to enter the program?
+cd /Users/charliem/VSCode/github_projects/reader3
+uv run server.py
+
+then open http://127.0.0.1:8123
+

@@ -5,150 +5,1120 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.metadata.title }}</title>
     <style>
-        /* Layout */
-        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: #fff; }
+        :root {
+            --bg: #050505;
+            --panel: rgba(10, 10, 10, 0.88);
+            --panel-border: rgba(255, 255, 255, 0.09);
+            --text: rgba(250, 248, 244, 0.96);
+            --muted: rgba(220, 214, 204, 0.68);
+            --accent: #f2e4bc;
+            --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+            --page-gap: 7vw;
+            --page-padding-x: clamp(2.5rem, 6vw, 6rem);
+            --page-padding-y: clamp(2.5rem, 5vh, 4.5rem);
+            --page-column-width: 820px;
+        }
 
-        /* Sidebar */
-        #sidebar { width: 300px; background: #f8f9fa; border-right: 1px solid #e9ecef; overflow-y: auto; padding: 20px; flex-shrink: 0; }
-        .nav-header { font-family: -apple-system, sans-serif; font-weight: bold; color: #495057; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #dee2e6; }
-        .nav-home { display: block; margin-bottom: 20px; color: #3498db; text-decoration: none; font-family: -apple-system, sans-serif; font-size: 0.9em; }
+        * { box-sizing: border-box; }
 
-        /* TOC Tree */
-        ul.toc-list { list-style: none; padding-left: 0; margin: 0; }
-        ul.toc-list ul { padding-left: 20px; } /* Indent children */
-        li.toc-item { margin-bottom: 8px; }
-        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 4px 0; line-height: 1.4; }
-        a.toc-link:hover { color: #000; text-decoration: underline; }
-        a.toc-link.active { color: #d63384; font-weight: bold; }
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 34%),
+                radial-gradient(circle at bottom, rgba(255, 255, 255, 0.03), transparent 42%),
+                var(--bg);
+            color: var(--text);
+            font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        }
 
-        /* Main Content */
-        #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
-        .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; }
+        body {
+            position: relative;
+        }
 
-        /* Content Styling (Basic normalization for the book HTML) */
-        .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
-        .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: #333; }
-        .book-content p { margin-bottom: 1.5em; text-align: justify; }
+        .reader-shell {
+            position: relative;
+            height: 100vh;
+            overflow: hidden;
+            padding: clamp(1rem, 2vw, 1.5rem);
+        }
 
-        /* Navigation Footer */
-        .chapter-nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-family: -apple-system, sans-serif; }
-        .nav-btn { text-decoration: none; color: #3498db; font-weight: bold; padding: 10px 20px; border: 1px solid #3498db; border-radius: 4px; transition: all 0.2s; }
-        .nav-btn:hover { background: #3498db; color: white; }
-        .nav-btn.disabled { opacity: 0.5; pointer-events: none; border-color: #ccc; color: #ccc; }
+        .top-bar {
+            position: absolute;
+            top: clamp(1rem, 2vw, 1.5rem);
+            left: clamp(1rem, 2vw, 1.5rem);
+            right: clamp(1rem, 2vw, 1.5rem);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            pointer-events: none;
+        }
 
+        .controls-left,
+        .controls-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            pointer-events: auto;
+        }
+
+        .control-btn,
+        .home-link {
+            border: 1px solid var(--panel-border);
+            background: var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 999px;
+            padding: 0.72rem 1rem;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.03em;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+            cursor: pointer;
+        }
+
+        .control-btn:hover,
+        .home-link:hover,
+        .control-btn:focus-visible,
+        .home-link:focus-visible {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(24, 24, 24, 0.94);
+            outline: none;
+        }
+
+        .control-btn.is-accent {
+            border-color: rgba(242, 228, 188, 0.26);
+            color: var(--accent);
+        }
+
+        .control-btn.is-accent:hover,
+        .control-btn.is-accent:focus-visible {
+            border-color: rgba(242, 228, 188, 0.42);
+        }
+
+        .chrome-chip {
+            border: 1px solid var(--panel-border);
+            background: rgba(10, 10, 10, 0.68);
+            border-radius: 999px;
+            padding: 0.7rem 1rem;
+            color: var(--muted);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.82rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            backdrop-filter: blur(12px);
+        }
+
+        #sidebar {
+            position: absolute;
+            top: clamp(4.5rem, 7vw, 6rem);
+            left: clamp(1rem, 2vw, 1.5rem);
+            bottom: clamp(1rem, 2vw, 1.5rem);
+            width: min(360px, calc(100vw - 2rem));
+            padding: 1.25rem;
+            border: 1px solid var(--panel-border);
+            background: rgba(9, 9, 9, 0.94);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow-y: auto;
+            z-index: 30;
+            transform: translateX(-110%);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.24s ease, opacity 0.24s ease;
+        }
+
+        body.sidebar-open #sidebar {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-title {
+            margin: 0;
+            color: var(--text);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        .sidebar-meta {
+            margin: 0.3rem 0 0;
+            color: var(--muted);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.84rem;
+        }
+
+        ul.toc-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        ul.toc-list ul {
+            margin-top: 0.35rem;
+            padding-left: 1rem;
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        li.toc-item {
+            margin: 0.3rem 0;
+        }
+
+        a.toc-link {
+            display: block;
+            padding: 0.45rem 0.2rem;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        a.toc-link:hover,
+        a.toc-link.active {
+            color: var(--accent);
+        }
+
+        .scrim {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.24s ease;
+            z-index: 25;
+        }
+
+        body.sidebar-open .scrim {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #main {
+            position: relative;
+            height: 100%;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+        }
+
+        .page-frame {
+            position: relative;
+            width: min(100%, 1200px);
+            height: 100%;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .page-viewport {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        .page-track {
+            height: 100%;
+            column-width: var(--page-column-width);
+            column-gap: var(--page-gap);
+            padding: var(--page-padding-y) var(--page-padding-x);
+            overflow-x: hidden;
+            overflow-y: hidden;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+            overscroll-behavior-x: contain;
+            scroll-snap-type: x mandatory;
+        }
+
+        .page-track::-webkit-scrollbar {
+            display: none;
+        }
+
+        .book-content {
+            color: var(--text);
+            font-size: clamp(1.4rem, 1.5vw + 0.85rem, 2rem);
+            line-height: 1.55;
+            text-wrap: pretty;
+        }
+
+        .book-content > * {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .book-content h1,
+        .book-content h2,
+        .book-content h3,
+        .book-content h4,
+        .book-content h5,
+        .book-content h6 {
+            margin: 0 0 1.2rem;
+            color: #fffdf8;
+            font-weight: 700;
+            line-height: 1.06;
+            break-after: avoid;
+        }
+
+        .book-content h1 {
+            font-size: clamp(2.8rem, 4vw + 1rem, 5.8rem);
+            letter-spacing: -0.03em;
+        }
+
+        .book-content h2 {
+            font-size: clamp(2.2rem, 2vw + 1rem, 3.4rem);
+        }
+
+        .book-content h3 {
+            font-size: clamp(1.8rem, 1.2vw + 1rem, 2.5rem);
+        }
+
+        .book-content p,
+        .book-content li,
+        .book-content blockquote {
+            margin: 0 0 1.15em;
+        }
+
+        .book-content p:first-child {
+            margin-top: 0;
+        }
+
+        .book-content img {
+            display: block;
+            max-width: 100%;
+            max-height: 62vh;
+            width: auto;
+            height: auto;
+            margin: 1.2rem auto 1.8rem;
+            border-radius: 18px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
+            break-inside: avoid;
+        }
+
+        .book-content a {
+            color: var(--accent);
+        }
+
+        .book-section {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .book-section + .book-section {
+            margin-top: 2rem;
+        }
+
+        .saved-word {
+            display: inline;
+            padding: 0.05em 0.12em;
+            border-radius: 0.28em;
+            background: rgba(242, 228, 188, 0.25);
+            box-shadow: inset 0 -1px 0 rgba(242, 228, 188, 0.3);
+        }
+
+        .status-bar {
+            position: absolute;
+            left: 50%;
+            bottom: clamp(1rem, 2vw, 1.5rem);
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 220px;
+            padding: 0.7rem 1rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 999px;
+            background: rgba(10, 10, 10, 0.8);
+            color: var(--muted);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.08em;
+            backdrop-filter: blur(18px);
+            box-shadow: var(--shadow);
+        }
+
+        .reader-toast {
+            position: absolute;
+            top: clamp(4.8rem, 8vw, 6.3rem);
+            right: clamp(1rem, 2vw, 1.5rem);
+            z-index: 24;
+            max-width: min(360px, calc(100vw - 2rem));
+            padding: 0.85rem 1rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            background: rgba(10, 10, 10, 0.88);
+            color: var(--text);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .reader-toast.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .page-nav {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .nav-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 9%;
+            min-width: 40px;
+            max-width: 72px;
+            pointer-events: auto;
+            border: 0;
+            background: linear-gradient(to right, rgba(255, 255, 255, 0.06), transparent);
+            opacity: 0;
+            transition: opacity 0.18s ease;
+            cursor: pointer;
+        }
+
+        .nav-zone:hover,
+        .nav-zone:focus-visible {
+            opacity: 1;
+            outline: none;
+        }
+
+        .nav-zone.next {
+            right: 0;
+            background: linear-gradient(to left, rgba(255, 255, 255, 0.06), transparent);
+        }
+
+        .nav-zone.prev {
+            left: 0;
+        }
+
+        .nav-zone.disabled {
+            pointer-events: none;
+        }
+
+        .nav-label {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .nav-zone.prev .nav-label {
+            left: 1rem;
+        }
+
+        .nav-zone.next .nav-label {
+            right: 1rem;
+        }
+
+        @media (max-width: 900px) {
+            :root {
+                --page-gap: 12vw;
+                --page-padding-x: 1.4rem;
+                --page-padding-y: 5.4rem;
+            }
+
+            .top-bar {
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+
+            .controls-right {
+                gap: 0.5rem;
+            }
+
+            .controls-right .chrome-chip {
+                display: none;
+            }
+
+            .book-content {
+                font-size: clamp(1.1rem, 1rem + 1.6vw, 1.45rem);
+                line-height: 1.58;
+            }
+
+            .book-content h1 {
+                font-size: clamp(2.2rem, 7vw, 3.4rem);
+            }
+
+            .page-nav {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
-
-    <!-- SIDEBAR -->
-    <div id="sidebar">
-        <a href="/" class="nav-home">← Back to Library</a>
-        <div class="nav-header">{{ book.metadata.title }}</div>
-
-        <!-- Recursive Macro for TOC -->
-        {% macro render_toc(items) %}
-            <ul class="toc-list">
-            {% for item in items %}
-                <li class="toc-item">
-                    <!--
-                        Matching Logic:
-                        If the TOC item filename matches the current chapter filename, mark active.
-                        Ideally we match spine indices, but Reader 3 TOC maps to filenames.
-                        We use a simple hash matching logic here.
-                    -->
-                    {% set is_active = current_chapter.href == item.file_href %}
-
-                    <!--
-                       We need to find which linear chapter index (0, 1, 2) corresponds
-                       to this TOC entry file.
-                       Since that's hard to calculate in Jinja, we just link to the
-                       file anchor. BUT, to make our linear navigation work, we
-                       rely on the fact that the user is currently reading 'chapter_index'.
-
-                       Ideally, clicking a TOC link should find the 'index' of that file.
-                       For simplicity in this version: We link to the 'href' (filename)
-                       and let JavaScript or Backend handle it?
-
-                       Actually, let's just link to the file. The browser interprets #anchors.
-                       However, our router uses /read/book/INDEX.
-
-                       SIMPLE FIX: We won't link the TOC to the route index in this simple version
-                       unless we build a map. We will visually show structure,
-                       but rely on "Previous/Next" for linear reading.
-
-                       BETTER FIX: Use JavaScript to match filenames.
-                    -->
-                    <a href="#" onclick="findAndGo('{{ item.file_href }}')"
-                       class="toc-link {% if is_active %}active{% endif %}">
-                        {{ item.title }}
-                    </a>
-
-                    {% if item.children %}
-                        {{ render_toc(item.children) }}
-                    {% endif %}
-                </li>
-            {% endfor %}
-            </ul>
-        {% endmacro %}
-
-        {{ render_toc(book.toc) }}
-    </div>
-
-    <!-- MAIN CONTENT -->
-    <div id="main">
-        <div class="content-container">
-            <div class="book-content">
-                {{ current_chapter.content | safe }}
+    <div class="reader-shell">
+        <div class="top-bar">
+            <div class="controls-left">
+                <button type="button" class="control-btn" id="toggle-sidebar">Contents</button>
+                <a href="/" class="home-link">Library</a>
             </div>
-
-            <div class="chapter-nav">
-                {% if prev_idx is not none %}
-                    <a href="/read/{{ book_id }}/{{ prev_idx }}" class="nav-btn">← Previous</a>
-                {% else %}
-                    <span class="nav-btn disabled">← Previous</span>
-                {% endif %}
-
-                <span style="color: #999; padding: 10px;">
-                    Section {{ chapter_index + 1 }} of {{ book.spine|length }}
-                </span>
-
-                {% if next_idx is not none %}
-                    <a href="/read/{{ book_id }}/{{ next_idx }}" class="nav-btn">Next →</a>
-                {% else %}
-                    <span class="nav-btn disabled">Next →</span>
-                {% endif %}
+            <div class="controls-right">
+                <button type="button" class="control-btn is-accent" id="save-word-btn">New Words</button>
+                <div class="chrome-chip">{{ book.metadata.title }}</div>
             </div>
         </div>
+
+        <aside id="sidebar" aria-hidden="true">
+            <div class="sidebar-header">
+                <div>
+                    <h2 class="sidebar-title">{{ book.metadata.title }}</h2>
+                    <p class="sidebar-meta">
+                        {% if book.metadata.authors %}
+                            {{ book.metadata.authors | join(", ") }}
+                        {% else %}
+                            Unknown author
+                        {% endif %}
+                    </p>
+                </div>
+                <button type="button" class="control-btn" id="close-sidebar">Close</button>
+            </div>
+
+            {% macro render_toc(items) %}
+                <ul class="toc-list">
+                {% for item in items %}
+                    <li class="toc-item">
+                        <a href="#" onclick="findAndGo('{{ item.file_href }}'); return false;" class="toc-link">
+                            {{ item.title }}
+                        </a>
+                        {% if item.children %}
+                            {{ render_toc(item.children) }}
+                        {% endif %}
+                    </li>
+                {% endfor %}
+                </ul>
+            {% endmacro %}
+
+            {{ render_toc(book.toc) }}
+        </aside>
+
+        <button type="button" class="scrim" id="sidebar-scrim" aria-label="Close contents"></button>
+
+        <main id="main">
+            <div class="page-frame">
+                <div class="page-viewport">
+                    <div class="page-track" id="page-track">
+                        <article class="book-content" id="book-content">
+                            {% for chapter in book.spine %}
+                                <section
+                                    class="book-section"
+                                    id="section-{{ chapter.order }}"
+                                    data-section-index="{{ chapter.order }}"
+                                    data-href="{{ chapter.href }}"
+                                >
+                                    {{ chapter.content | safe }}
+                                </section>
+                            {% endfor %}
+                        </article>
+                    </div>
+                </div>
+
+                <div class="page-nav" aria-hidden="true">
+                    <button type="button" class="nav-zone prev" id="prev-zone">
+                        <span class="nav-label">Previous</span>
+                    </button>
+                    <button type="button" class="nav-zone next" id="next-zone">
+                        <span class="nav-label">Next</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <div class="status-bar">
+            <span id="page-indicator">1 / 1</span>
+        </div>
+
+        <div class="reader-toast" id="reader-toast" role="status" aria-live="polite"></div>
     </div>
 
     <script>
-        // Helper to map TOC filenames to Spine Indices
-        // Pass the spine data from python to JS
-        const spineMap = {
-            {% for ch in book.spine %}
-            "{{ ch.href }}": {{ ch.order }},
-            {% endfor %}
-        };
+        const body = document.body;
+        const pageTrack = document.getElementById("page-track");
+        const pageIndicator = document.getElementById("page-indicator");
+        const bookContent = document.getElementById("book-content");
+        const toggleSidebarButton = document.getElementById("toggle-sidebar");
+        const closeSidebarButton = document.getElementById("close-sidebar");
+        const sidebarScrim = document.getElementById("sidebar-scrim");
+        const prevZone = document.getElementById("prev-zone");
+        const nextZone = document.getElementById("next-zone");
+        const saveWordButton = document.getElementById("save-word-btn");
+        const readerToast = document.getElementById("reader-toast");
+        const sectionElements = Array.from(document.querySelectorAll(".book-section"));
+        const sectionByHref = new Map(sectionElements.map((section) => [section.dataset.href, section]));
+        const bookId = "{{ book_id }}";
+        const urlParams = new URLSearchParams(window.location.search);
+        const progressStorageKey = "reader3-progress:" + bookId;
 
-        function findAndGo(filename) {
-            // The TOC usually has specific filenames e.g. "text/part001.html"
-            // Sometimes it has anchors "text/part001.html#header"
-            // We strip the anchor to find the page index
-            const cleanFile = filename.split('#')[0];
-            const anchor = filename.split('#')[1];
+        let pageWidth = 1;
+        let pageCount = 1;
+        let pageStep = 1;
+        let currentPage = 1;
+        let targetPage = 1;
+        let settleScrollTimer = null;
+        let toastTimer = null;
+        let persistTimer = null;
+        let restoreAttempts = 0;
+        const savedWords = new Set();
 
-            const idx = spineMap[cleanFile];
+        function openSidebar() {
+            body.classList.add("sidebar-open");
+        }
 
-            if (idx !== undefined) {
-                let url = "/read/{{ book_id }}/" + idx;
-                // If there was an anchor, we could try to scroll to it,
-                // but simple page loads often lose anchor position without extra JS.
-                // Let's just go to the page.
-                window.location.href = url;
-            } else {
-                console.log("Could not find index for", filename);
+        function closeSidebar() {
+            body.classList.remove("sidebar-open");
+        }
+
+        function toggleSidebar() {
+            body.classList.toggle("sidebar-open");
+        }
+
+        function readProgress() {
+            try {
+                const raw = window.localStorage.getItem(progressStorageKey);
+                if (!raw) {
+                    return { page: 1 };
+                }
+                const parsed = JSON.parse(raw);
+                if (!parsed || !Number.isInteger(parsed.page) || parsed.page < 1) {
+                    return { page: 1 };
+                }
+                return parsed;
+            } catch (error) {
+                return { page: 1 };
             }
         }
+
+        function rememberReadingPosition(pageNumber = currentPageNumber()) {
+            try {
+                window.localStorage.setItem(progressStorageKey, JSON.stringify({
+                    page: Math.max(1, pageNumber),
+                    updated_at: Date.now()
+                }));
+            } catch (error) {
+                // Ignore storage failures.
+            }
+        }
+
+        function scheduleRememberReadingPosition() {
+            if (persistTimer) {
+                window.clearTimeout(persistTimer);
+            }
+
+            persistTimer = window.setTimeout(() => {
+                rememberReadingPosition();
+            }, 120);
+        }
+
+        function clampPage(pageNumber) {
+            return Math.max(1, Math.min(pageNumber, pageCount));
+        }
+
+        function maxScrollLeft() {
+            return Math.max(0, pageTrack.scrollWidth - pageTrack.clientWidth);
+        }
+
+        function pageTolerance() {
+            return Math.max(2, pageStep * 0.05);
+        }
+
+        function computePageCount() {
+            const reachableWidth = maxScrollLeft();
+            if (reachableWidth <= pageTolerance()) {
+                return 1;
+            }
+
+            const fullSteps = Math.floor(reachableWidth / pageStep);
+            const remainder = reachableWidth - (fullSteps * pageStep);
+            return fullSteps + 1 + (remainder > pageTolerance() ? 1 : 0);
+        }
+
+        function isAtFirstPageBoundary() {
+            return pageTrack.scrollLeft <= pageTolerance();
+        }
+
+        function isAtLastPageBoundary() {
+            return maxScrollLeft() - pageTrack.scrollLeft <= pageTolerance();
+        }
+
+        function updatePageIndicator() {
+            pageIndicator.textContent = currentPage + " / " + pageCount;
+            prevZone.classList.toggle("disabled", currentPage <= 1);
+            nextZone.classList.toggle("disabled", currentPage >= pageCount);
+        }
+
+        function showToast(message, isError = false) {
+            if (toastTimer) {
+                window.clearTimeout(toastTimer);
+            }
+
+            readerToast.textContent = message;
+            readerToast.style.borderColor = isError ? "rgba(255, 120, 120, 0.28)" : "";
+            readerToast.classList.add("visible");
+
+            toastTimer = window.setTimeout(() => {
+                readerToast.classList.remove("visible");
+            }, 2200);
+        }
+
+        function escapeRegExp(value) {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+
+        function normalizeWord(value) {
+            return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+        }
+
+        function buildWordPattern(word) {
+            return new RegExp("(^|[^\\p{L}\\p{N}_])(" + escapeRegExp(word) + ")(?=$|[^\\p{L}\\p{N}_])", "giu");
+        }
+
+        function textNodesForHighlighting(scope) {
+            const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    if (!node.nodeValue || !node.nodeValue.trim()) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+
+                    const parent = node.parentElement;
+                    if (!parent) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+
+                    if (parent.closest(".saved-word")) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+
+                    if (["SCRIPT", "STYLE"].includes(parent.tagName)) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+
+            const nodes = [];
+            let currentNode = walker.nextNode();
+            while (currentNode) {
+                nodes.push(currentNode);
+                currentNode = walker.nextNode();
+            }
+            return nodes;
+        }
+
+        function savedWordKey(sectionIndex, word) {
+            return sectionIndex + ":" + normalizeWord(word);
+        }
+
+        function highlightWord(word, scope = bookContent, sectionIndex = "book") {
+            const normalized = normalizeWord(word);
+            const pattern = buildWordPattern(word);
+            const textNodes = textNodesForHighlighting(scope);
+            let foundMatch = false;
+
+            for (const textNode of textNodes) {
+                const text = textNode.nodeValue;
+                pattern.lastIndex = 0;
+                if (!pattern.test(text)) {
+                    continue;
+                }
+
+                pattern.lastIndex = 0;
+                const fragment = document.createDocumentFragment();
+                let lastIndex = 0;
+                let match = pattern.exec(text);
+
+                while (match) {
+                    const prefix = match[1] || "";
+                    const matchedWord = match[2];
+                    const wordStart = match.index + prefix.length;
+
+                    if (wordStart > lastIndex) {
+                        fragment.appendChild(document.createTextNode(text.slice(lastIndex, wordStart)));
+                    }
+
+                    const mark = document.createElement("span");
+                    mark.className = "saved-word";
+                    mark.dataset.word = normalized;
+                    mark.textContent = matchedWord;
+                    fragment.appendChild(mark);
+
+                    lastIndex = wordStart + matchedWord.length;
+                    foundMatch = true;
+                    match = pattern.exec(text);
+                }
+
+                if (lastIndex < text.length) {
+                    fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+                }
+
+                textNode.parentNode.replaceChild(fragment, textNode);
+            }
+
+            if (foundMatch) {
+                savedWords.add(savedWordKey(sectionIndex, normalized));
+            }
+        }
+
+        function cleanText(value) {
+            return value.replace(/\s+/g, " ").trim();
+        }
+
+        function sentenceBounds(text, index) {
+            const boundaryPattern = /[.!?][)"'\]]*\s+|[\n\r]+/g;
+            let start = 0;
+            let end = text.length;
+            let match = boundaryPattern.exec(text);
+
+            while (match) {
+                const boundaryEnd = match.index + match[0].length;
+                if (boundaryEnd <= index) {
+                    start = boundaryEnd;
+                } else {
+                    end = match.index + match[0].trimEnd().length;
+                    break;
+                }
+                match = boundaryPattern.exec(text);
+            }
+
+            return { start, end };
+        }
+
+        function selectedSectionElement(range) {
+            const anchor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+                ? range.commonAncestorContainer.parentElement
+                : range.commonAncestorContainer;
+            return anchor instanceof Element ? anchor.closest(".book-section") : null;
+        }
+
+        function selectedWordPayload() {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                return null;
+            }
+
+            const range = selection.getRangeAt(0);
+            if (!bookContent.contains(range.commonAncestorContainer)) {
+                return null;
+            }
+
+            const word = selection.toString().trim();
+            if (!/^[\p{L}\p{N}][\p{L}\p{N}'’-]*$/u.test(word)) {
+                return null;
+            }
+
+            const section = selectedSectionElement(range);
+            if (!section) {
+                return null;
+            }
+
+            const sectionText = cleanText(section.textContent || "");
+            if (!sectionText) {
+                return null;
+            }
+
+            const selectedText = cleanText(selection.toString());
+            const matchIndex = sectionText.toLocaleLowerCase().indexOf(selectedText.toLocaleLowerCase());
+            const bounds = sentenceBounds(sectionText, Math.max(0, matchIndex));
+            const sentence = cleanText(sectionText.slice(bounds.start, bounds.end)) || sectionText;
+
+            return {
+                word,
+                sentence,
+                chapterIndex: parseInt(section.dataset.sectionIndex, 10),
+                section,
+            };
+        }
+
+        async function loadSavedWords() {
+            try {
+                const response = await fetch("/api/new-words/" + encodeURIComponent(bookId));
+                if (!response.ok) {
+                    throw new Error("Failed to load words");
+                }
+
+                const payload = await response.json();
+                for (const entry of payload.words) {
+                    const section = document.getElementById("section-" + entry.chapter_index);
+                    highlightWord(entry.word, section || bookContent, entry.chapter_index);
+                }
+            } catch (error) {
+                showToast("Couldn't load saved words from PostgreSQL.", true);
+            }
+        }
+
+        async function saveSelectedWord() {
+            const payload = selectedWordPayload();
+            if (!payload) {
+                showToast("Select a single word in the text, then press n or click New Words.", true);
+                return;
+            }
+
+            const wordKey = savedWordKey(payload.chapterIndex, payload.word);
+            if (savedWords.has(wordKey)) {
+                showToast("\"" + payload.word + "\" is already saved.");
+                return;
+            }
+
+            try {
+                const response = await fetch("/api/new-words", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        book_id: bookId,
+                        chapter_index: payload.chapterIndex,
+                        page_number: currentPageNumber(),
+                        sentence: payload.sentence,
+                        word: payload.word
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to save word");
+                }
+
+                highlightWord(payload.word, payload.section, payload.chapterIndex);
+                const selection = window.getSelection();
+                if (selection) {
+                    selection.removeAllRanges();
+                }
+                showToast("Saved \"" + payload.word + "\" to New Words.");
+            } catch (error) {
+                showToast("Couldn't save that word to PostgreSQL.", true);
+            }
+        }
+
+        function syncCurrentPageFromScroll() {
+            if (isAtFirstPageBoundary()) {
+                currentPage = 1;
+                targetPage = 1;
+                updatePageIndicator();
+                return;
+            }
+
+            if (isAtLastPageBoundary()) {
+                currentPage = pageCount;
+                targetPage = pageCount;
+                updatePageIndicator();
+                return;
+            }
+
+            currentPage = clampPage(Math.round(pageTrack.scrollLeft / pageStep) + 1);
+            if (Math.abs(pageTrack.scrollLeft - ((targetPage - 1) * pageStep)) < 2) {
+                currentPage = targetPage;
+            }
+            updatePageIndicator();
+        }
+
+        function updatePagination() {
+            pageWidth = pageTrack.clientWidth;
+            if (pageWidth <= 0) {
+                pageWidth = 1;
+            }
+
+            const computedStyles = window.getComputedStyle(pageTrack);
+            const paddingLeft = parseFloat(computedStyles.paddingLeft) || 0;
+            const paddingRight = parseFloat(computedStyles.paddingRight) || 0;
+            const columnGap = parseFloat(computedStyles.columnGap) || 0;
+            const columnWidth = Math.max(240, pageWidth - paddingLeft - paddingRight);
+            pageTrack.style.setProperty("--page-column-width", columnWidth + "px");
+            pageStep = columnWidth + columnGap;
+
+            pageCount = computePageCount();
+            currentPage = clampPage(currentPage);
+            targetPage = clampPage(targetPage);
+            syncCurrentPageFromScroll();
+        }
+
+        function scrollToPage(pageNumber, behavior = "smooth") {
+            const clampedPage = clampPage(pageNumber);
+            const targetLeft = Math.min(maxScrollLeft(), (clampedPage - 1) * pageStep);
+            targetPage = clampedPage;
+            currentPage = clampedPage;
+            updatePageIndicator();
+
+            if (settleScrollTimer) {
+                window.clearTimeout(settleScrollTimer);
+            }
+
+            pageTrack.scrollTo({
+                left: targetLeft,
+                behavior
+            });
+
+            settleScrollTimer = window.setTimeout(() => {
+                const snappedPage = clampPage(Math.round(pageTrack.scrollLeft / pageStep) + 1);
+                currentPage = snappedPage === targetPage ? targetPage : snappedPage;
+                updatePageIndicator();
+                rememberReadingPosition(currentPage);
+            }, 220);
+        }
+
+        function currentPageNumber() {
+            if (isAtFirstPageBoundary()) {
+                return 1;
+            }
+
+            if (isAtLastPageBoundary()) {
+                return pageCount;
+            }
+
+            return clampPage(Math.max(currentPage, targetPage));
+        }
+
+        function goToPreviousPage() {
+            if (currentPageNumber() > 1) {
+                scrollToPage(currentPageNumber() - 1);
+            }
+        }
+
+        function goToNextPage() {
+            if (currentPageNumber() < pageCount) {
+                scrollToPage(currentPageNumber() + 1);
+            }
+        }
+
+        function pageForElement(element) {
+            const trackRect = pageTrack.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
+            const absoluteLeft = pageTrack.scrollLeft + (elementRect.left - trackRect.left);
+            return clampPage(Math.floor(Math.max(0, absoluteLeft) / pageStep) + 1);
+        }
+
+        function findAndGo(filename) {
+            const cleanFile = filename.split("#")[0];
+            const section = sectionByHref.get(cleanFile);
+
+            if (section) {
+                closeSidebar();
+                scrollToPage(pageForElement(section), "auto");
+                rememberReadingPosition(currentPageNumber());
+            } else {
+                console.log("Could not find section for", filename);
+            }
+        }
+
+        function requestedInitialPage() {
+            const requestedPage = urlParams.get("page");
+            if (requestedPage && /^\d+$/.test(requestedPage)) {
+                return parseInt(requestedPage, 10);
+            }
+            return readProgress().page || 1;
+        }
+
+        function restoreInitialPosition() {
+            updatePagination();
+            const wantedPage = requestedInitialPage();
+            scrollToPage(wantedPage, "auto");
+            rememberReadingPosition(wantedPage);
+            restoreAttempts += 1;
+            if (restoreAttempts < 4) {
+                window.setTimeout(restoreInitialPosition, restoreAttempts === 1 ? 120 : 260);
+            }
+        }
+
+        toggleSidebarButton.addEventListener("click", toggleSidebar);
+        closeSidebarButton.addEventListener("click", closeSidebar);
+        sidebarScrim.addEventListener("click", closeSidebar);
+        saveWordButton.addEventListener("click", saveSelectedWord);
+        prevZone.addEventListener("click", goToPreviousPage);
+        nextZone.addEventListener("click", goToNextPage);
+
+        pageTrack.addEventListener("scroll", () => {
+            syncCurrentPageFromScroll();
+            scheduleRememberReadingPosition();
+        }, { passive: true });
+
+        window.addEventListener("resize", () => {
+            const previousPage = currentPageNumber();
+            updatePagination();
+            scrollToPage(previousPage, "auto");
+            rememberReadingPosition(previousPage);
+        });
+
+        window.addEventListener("pagehide", () => {
+            rememberReadingPosition();
+        });
+
+        window.addEventListener("beforeunload", () => {
+            rememberReadingPosition();
+        });
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "hidden") {
+                rememberReadingPosition();
+            }
+        });
+
+        document.addEventListener("keydown", (event) => {
+            const target = event.target;
+            const isEditable = target instanceof HTMLElement && (
+                target.tagName === "INPUT" ||
+                target.tagName === "TEXTAREA" ||
+                target.isContentEditable
+            );
+
+            if (isEditable) {
+                return;
+            }
+
+            if (event.key === "Escape") {
+                closeSidebar();
+                return;
+            }
+
+            if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                goToPreviousPage();
+            }
+
+            if (event.key === "ArrowRight" || event.key === " ") {
+                event.preventDefault();
+                goToNextPage();
+            }
+
+            if (event.key.toLowerCase() === "n" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+                event.preventDefault();
+                saveSelectedWord();
+            }
+        });
+
+        window.addEventListener("load", async () => {
+            restoreInitialPosition();
+            for (const image of bookContent.querySelectorAll("img")) {
+                if (!image.complete) {
+                    image.addEventListener("load", restoreInitialPosition, { once: true });
+                    image.addEventListener("error", restoreInitialPosition, { once: true });
+                }
+            }
+            await loadSavedWords();
+        });
     </script>
 </body>
 </html>
