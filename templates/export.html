@@ -70,6 +70,7 @@
         .top-links {
             display: flex;
             flex-wrap: wrap;
+            justify-content: flex-end;
             gap: 0.7rem;
             margin-bottom: 1.3rem;
         }
@@ -93,6 +94,11 @@
         .pill {
             padding: 0.72rem 1rem;
             font-size: 0.88rem;
+        }
+
+        .pill.is-accent {
+            color: var(--accent);
+            border-color: rgba(242, 228, 188, 0.26);
         }
 
         .pill:hover,
@@ -217,8 +223,8 @@
                     {% if book_id %}
                         <a href="/read/{{ book_id }}" class="pill">Back To Reader</a>
                     {% endif %}
-                    <a href="/vocabulary{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Words Stats</a>
                     <a href="/vocabulary/flashcards{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Flashcards</a>
+                    <a href="/vocabulary/export{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill is-accent">Export CSV</a>
                 </nav>
 
                 <h1 id="export-title">Export CSV</h1>

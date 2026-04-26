@@ -72,7 +72,7 @@
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 1rem;
             margin-bottom: 2rem;
         }
@@ -272,10 +272,16 @@
         }
 
         .card-front-top {
+            justify-content: flex-start;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             background:
                 radial-gradient(circle at top left, rgba(242, 228, 188, 0.12), transparent 48%),
                 rgba(255, 255, 255, 0.02);
+        }
+
+        .card-front-top .card-meta {
+            margin-top: clamp(1.4rem, 5vh, 3rem);
+            margin-bottom: 0.55rem;
         }
 
         .card-front-bottom {
@@ -538,7 +544,6 @@
                     {% if book_id %}
                         <a href="/read/{{ book_id }}" class="pill">Back To Reader</a>
                     {% endif %}
-                    <a href="/vocabulary{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Words Stats</a>
                     <a href="/vocabulary/flashcards{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill is-accent">Flashcards</a>
                     <a href="/vocabulary/export{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Export CSV</a>
                 </div>
@@ -564,7 +569,7 @@
                                 <div class="flashcard-inner">
                                     <article class="card-face card-front">
                                         <div class="card-front-top">
-                                            <div class="card-meta">{{ entry.book_title }} · Page {{ entry.page_number }}</div>
+                                            <div class="card-meta">{{ entry.book_title }} · Chapter {{ entry.chapter_number }}</div>
                                             <h2 class="word">{{ entry.word }}</h2>
                                         </div>
                                         <div class="card-front-bottom">

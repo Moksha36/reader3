@@ -208,6 +208,28 @@ def csv_response(rows: list[list[str]], filename: str) -> Response:
     )
 
 
+def flattened_toc_entries(entries: list[TOCEntry]) -> list[TOCEntry]:
+    flattened = []
+    for entry in entries:
+        flattened.append(entry)
+        flattened.extend(flattened_toc_entries(entry.children))
+    return flattened
+
+
+def chapter_display_number(book: Book, chapter_index: int) -> int:
+    if 0 <= chapter_index < len(book.spine):
+        chapter_href = book.spine[chapter_index].href
+        for entry in flattened_toc_entries(book.toc):
+            if entry.file_href != chapter_href:
+                continue
+
+            match = re.search(r"\bchapter\s+(\d+)\b", entry.title or "", re.IGNORECASE)
+            if match:
+                return int(match.group(1))
+
+    return chapter_index + 1
+
+
 def translate_word_with_openai(word: str, sentence: str) -> str:
     if not openai_client:
         return ""
@@ -1203,11 +1225,15 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
                 )
             rows = cur.fetchall()
 
-    flashcards = [
-        {
+    books_by_id = {row[1]: load_book_cached(row[1]) for row in rows}
+    flashcards = []
+    for row in rows:
+        row_book = books_by_id.get(row[1])
+        flashcards.append({
             "id": row[0],
             "book_id": row[1],
             "chapter_index": row[2],
+            "chapter_number": chapter_display_number(row_book, row[2]) if row_book else row[2] + 1,
             "page_number": row[3],
             "word": row[4],
             "sentence": row[5],
@@ -1216,9 +1242,7 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
             "memorized": row[7],
             "created_at": row[8],
             "book_title": books_index.get(row[1], {}).get("title", row[1]),
-        }
-        for row in rows
-    ]
+        })
 
     return templates.TemplateResponse("flashcards.html", {
         "request": request,
@@ -1268,16 +1292,15 @@ async def export_vocabulary_view(request: Request, book_id: Optional[str] = None
     chapters = []
     for row_book_id, chapter_index, count in rows:
         book = load_book_cached(row_book_id)
-        chapter_title = ""
-        if book and 0 <= chapter_index < len(book.spine):
-            chapter_title = book.spine[chapter_index].title
+        display_number = chapter_index + 1
+        if book:
+            display_number = chapter_display_number(book, chapter_index)
 
         chapters.append({
             "book_id": row_book_id,
             "book_title": books_index.get(row_book_id, {}).get("title", row_book_id),
             "chapter_index": chapter_index,
-            "chapter_number": chapter_index + 1,
-            "chapter_title": chapter_title,
+            "chapter_number": display_number,
             "count": count,
         })
 
@@ -1355,12 +1378,12 @@ async def export_vocabulary_chapter(book_id: str, chapter_index: int):
 
     csv_rows = [
         [book.metadata.title],
-        [f"Chapter {chapter_index + 1}"],
+        [f"Chapter {chapter_display_number(book, chapter_index)}"],
     ]
     for word, ai_explanation in rows:
         csv_rows.append([word, "", "", extract_context_meaning(ai_explanation)])
 
-    filename = f"{safe_book_id}_chapter_{chapter_index + 1}_vocabulary_export.csv"
+    filename = f"{safe_book_id}_chapter_{chapter_display_number(book, chapter_index)}_vocabulary_export.csv"
     return csv_response(csv_rows, filename)
 
 
