@@ -182,6 +182,32 @@ def content_disposition_filename(filename: str) -> str:
     return f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{utf8_filename}"
 
 
+def extract_context_meaning(ai_explanation: str) -> str:
+    soup = BeautifulSoup(ai_explanation or "", "html.parser")
+
+    for block in soup.select(".meaning-block"):
+        title = block.select_one(".meaning-title")
+        if not title or " ".join(title.get_text(" ", strip=True).split()).casefold() != "context meaning":
+            continue
+
+        text = block.select_one(".meaning-text")
+        return " ".join((text or block).get_text(" ", strip=True).split())
+
+    return ""
+
+
+def csv_response(rows: list[list[str]], filename: str) -> Response:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerows(rows)
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": content_disposition_filename(filename)},
+    )
+
+
 def translate_word_with_openai(word: str, sentence: str) -> str:
     if not openai_client:
         return ""
@@ -1204,8 +1230,68 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
     })
 
 
-@app.get("/vocabulary/export")
-async def export_vocabulary(book_id: Optional[str] = None):
+@app.get("/vocabulary/export", response_class=HTMLResponse)
+async def export_vocabulary_view(request: Request, book_id: Optional[str] = None):
+    if not ensure_new_words_table():
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable")
+
+    books_index = list_books_index()
+    safe_book_id = os.path.basename(book_id) if book_id else None
+
+    if safe_book_id and safe_book_id not in books_index:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            if safe_book_id:
+                cur.execute(
+                    """
+                    SELECT book_id, chapter_index, COUNT(*)
+                    FROM new_words
+                    WHERE book_id = %s
+                    GROUP BY book_id, chapter_index
+                    ORDER BY chapter_index ASC
+                    """,
+                    (safe_book_id,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT book_id, chapter_index, COUNT(*)
+                    FROM new_words
+                    GROUP BY book_id, chapter_index
+                    ORDER BY book_id ASC, chapter_index ASC
+                    """
+                )
+            rows = cur.fetchall()
+
+    chapters = []
+    for row_book_id, chapter_index, count in rows:
+        book = load_book_cached(row_book_id)
+        chapter_title = ""
+        if book and 0 <= chapter_index < len(book.spine):
+            chapter_title = book.spine[chapter_index].title
+
+        chapters.append({
+            "book_id": row_book_id,
+            "book_title": books_index.get(row_book_id, {}).get("title", row_book_id),
+            "chapter_index": chapter_index,
+            "chapter_number": chapter_index + 1,
+            "chapter_title": chapter_title,
+            "count": count,
+        })
+
+    return templates.TemplateResponse("export.html", {
+        "request": request,
+        "book_id": safe_book_id,
+        "book_title": books_index.get(safe_book_id, {}).get("title") if safe_book_id else None,
+        "chapters": chapters,
+        "total_count": sum(chapter["count"] for chapter in chapters),
+    })
+
+
+@app.get("/vocabulary/export/download")
+async def export_vocabulary_download(book_id: Optional[str] = None):
     if not ensure_new_words_table():
         raise HTTPException(status_code=503, detail="PostgreSQL is unavailable")
 
@@ -1233,19 +1319,49 @@ async def export_vocabulary(book_id: Optional[str] = None):
                 )
             rows = cur.fetchall()
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["word"])
-
+    csv_rows = [["word"]]
     for row in rows:
-        writer.writerow([row[0]])
+        csv_rows.append([row[0]])
 
     filename = f"{safe_book_id}_vocabulary_export.csv" if safe_book_id else "reader3_vocabulary_export.csv"
-    return Response(
-        content=output.getvalue(),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": content_disposition_filename(filename)},
-    )
+    return csv_response(csv_rows, filename)
+
+
+@app.get("/vocabulary/export/chapter")
+async def export_vocabulary_chapter(book_id: str, chapter_index: int):
+    if not ensure_new_words_table():
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable")
+
+    safe_book_id = os.path.basename(book_id)
+    book = load_book_cached(safe_book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if chapter_index < 0 or chapter_index >= len(book.spine):
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT word, ai_explanation
+                FROM new_words
+                WHERE book_id = %s AND chapter_index = %s
+                ORDER BY created_at ASC, id ASC
+                """,
+                (safe_book_id, chapter_index),
+            )
+            rows = cur.fetchall()
+
+    csv_rows = [
+        [book.metadata.title],
+        [f"Chapter {chapter_index + 1}"],
+    ]
+    for word, ai_explanation in rows:
+        csv_rows.append([word, "", "", extract_context_meaning(ai_explanation)])
+
+    filename = f"{safe_book_id}_chapter_{chapter_index + 1}_vocabulary_export.csv"
+    return csv_response(csv_rows, filename)
 
 
 @app.post("/vocabulary/toggle")
