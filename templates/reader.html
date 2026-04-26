@@ -13,10 +13,6 @@
             --muted: rgba(220, 214, 204, 0.68);
             --accent: #f2e4bc;
             --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
-            --page-gap: 7vw;
-            --page-padding-x: clamp(2.5rem, 6vw, 6rem);
-            --page-padding-y: clamp(2.5rem, 5vh, 4.5rem);
-            --page-column-width: 820px;
         }
 
         * { box-sizing: border-box; }
@@ -24,7 +20,6 @@
         html, body {
             margin: 0;
             min-height: 100%;
-            overflow: hidden;
             background:
                 radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 34%),
                 radial-gradient(circle at bottom, rgba(255, 255, 255, 0.03), transparent 42%),
@@ -34,7 +29,7 @@
         }
 
         body {
-            position: relative;
+            overflow: hidden;
         }
 
         .reader-shell {
@@ -94,24 +89,6 @@
         .control-btn.is-accent {
             border-color: rgba(242, 228, 188, 0.26);
             color: var(--accent);
-        }
-
-        .control-btn.is-accent:hover,
-        .control-btn.is-accent:focus-visible {
-            border-color: rgba(242, 228, 188, 0.42);
-        }
-
-        .chrome-chip {
-            border: 1px solid var(--panel-border);
-            background: rgba(10, 10, 10, 0.68);
-            border-radius: 999px;
-            padding: 0.7rem 1rem;
-            color: var(--muted);
-            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            font-size: 0.82rem;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            backdrop-filter: blur(12px);
         }
 
         #sidebar {
@@ -207,55 +184,32 @@
             pointer-events: auto;
         }
 
-        #main {
+        .page-stage {
             position: relative;
             height: 100%;
             display: flex;
-            align-items: stretch;
+            align-items: center;
             justify-content: center;
+            padding: clamp(3rem, 5vw, 4rem) clamp(0.5rem, 2vw, 1.5rem) clamp(2rem, 4vw, 3rem);
         }
 
-        .page-frame {
-            position: relative;
-            width: min(100%, 1200px);
-            height: 100%;
-            margin: 0 auto;
+        .page-card {
+            width: min(100%, 980px);
+            height: min(100%, 1200px);
+            border-radius: 30px;
+            background: transparent;
+            box-shadow: none;
             overflow: hidden;
-        }
-
-        .page-viewport {
-            position: absolute;
-            inset: 0;
-            overflow: hidden;
-        }
-
-        .page-track {
-            height: 100%;
-            column-width: var(--page-column-width);
-            column-gap: var(--page-gap);
-            padding: var(--page-padding-y) var(--page-padding-x);
-            overflow-x: hidden;
-            overflow-y: hidden;
-            scroll-behavior: smooth;
-            scrollbar-width: none;
-            overscroll-behavior-x: contain;
-            scroll-snap-type: x mandatory;
-        }
-
-        .page-track::-webkit-scrollbar {
-            display: none;
         }
 
         .book-content {
+            height: 100%;
+            padding: clamp(1.5rem, 3vw, 3rem);
             color: var(--text);
-            font-size: clamp(1.4rem, 1.5vw + 0.85rem, 2rem);
-            line-height: 1.55;
+            font-size: 1.55rem;
+            line-height: 1.3;
             text-wrap: pretty;
-        }
-
-        .book-content > * {
-            break-inside: avoid;
-            page-break-inside: avoid;
+            overflow: hidden;
         }
 
         .book-content h1,
@@ -268,55 +222,40 @@
             color: #fffdf8;
             font-weight: 700;
             line-height: 1.06;
-            break-after: avoid;
         }
 
         .book-content h1 {
-            font-size: clamp(2.8rem, 4vw + 1rem, 5.8rem);
+            font-size: 2.7em;
             letter-spacing: -0.03em;
         }
 
         .book-content h2 {
-            font-size: clamp(2.2rem, 2vw + 1rem, 3.4rem);
+            font-size: 1.95em;
         }
 
         .book-content h3 {
-            font-size: clamp(1.8rem, 1.2vw + 1rem, 2.5rem);
+            font-size: 1.5em;
         }
 
         .book-content p,
         .book-content li,
         .book-content blockquote {
-            margin: 0 0 1.15em;
-        }
-
-        .book-content p:first-child {
-            margin-top: 0;
+            margin: 0 0 0.45em;
         }
 
         .book-content img {
             display: block;
             max-width: 100%;
-            max-height: 62vh;
+            max-height: 56vh;
             width: auto;
             height: auto;
             margin: 1.2rem auto 1.8rem;
             border-radius: 18px;
             box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
-            break-inside: avoid;
         }
 
         .book-content a {
             color: var(--accent);
-        }
-
-        .book-section {
-            break-inside: avoid;
-            page-break-inside: avoid;
-        }
-
-        .book-section + .book-section {
-            margin-top: 2rem;
         }
 
         .saved-word {
@@ -325,6 +264,45 @@
             border-radius: 0.28em;
             background: rgba(242, 228, 188, 0.25);
             box-shadow: inset 0 -1px 0 rgba(242, 228, 188, 0.3);
+            cursor: help;
+        }
+
+        .meaning-tooltip {
+            position: fixed;
+            z-index: 60;
+            width: min(340px, calc(100vw - 2rem));
+            padding: 0.9rem 1rem;
+            border: 1px solid rgba(242, 228, 188, 0.2);
+            border-radius: 16px;
+            background: rgba(10, 10, 10, 0.94);
+            color: var(--text);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.9rem;
+            line-height: 1.45;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none;
+            transition: opacity 0.14s ease, transform 0.14s ease;
+        }
+
+        .meaning-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .meaning-tooltip-title {
+            margin-bottom: 0.35rem;
+            color: var(--accent);
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+        }
+
+        .meaning-tooltip-text {
+            color: rgba(250, 248, 244, 0.92);
         }
 
         .status-bar {
@@ -336,6 +314,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 0.6rem;
             min-width: 220px;
             padding: 0.7rem 1rem;
             border: 1px solid var(--panel-border);
@@ -437,12 +416,6 @@
         }
 
         @media (max-width: 900px) {
-            :root {
-                --page-gap: 12vw;
-                --page-padding-x: 1.4rem;
-                --page-padding-y: 5.4rem;
-            }
-
             .top-bar {
                 align-items: flex-start;
                 gap: 0.75rem;
@@ -452,21 +425,18 @@
                 gap: 0.5rem;
             }
 
-            .controls-right .chrome-chip {
+            .page-nav {
                 display: none;
+            }
+
+            .page-card {
+                border-radius: 22px;
+                height: min(100%, 760px);
             }
 
             .book-content {
-                font-size: clamp(1.1rem, 1rem + 1.6vw, 1.45rem);
-                line-height: 1.58;
-            }
-
-            .book-content h1 {
-                font-size: clamp(2.2rem, 7vw, 3.4rem);
-            }
-
-            .page-nav {
-                display: none;
+                padding: 1.3rem;
+                font-size: clamp(1.05rem, 1rem + 1.2vw, 1.35rem);
             }
         }
     </style>
@@ -480,7 +450,9 @@
             </div>
             <div class="controls-right">
                 <button type="button" class="control-btn is-accent" id="save-word-btn">New Words</button>
-                <div class="chrome-chip">{{ book.metadata.title }}</div>
+                <a href="/vocabulary?book_id={{ book_id|urlencode }}" class="home-link">Words Stats</a>
+                <a href="/vocabulary/flashcards?book_id={{ book_id|urlencode }}" class="home-link">Flashcards</a>
+                <a href="/vocabulary/export?book_id={{ book_id|urlencode }}" class="home-link">Export CSV</a>
             </div>
         </div>
 
@@ -502,10 +474,15 @@
             {% macro render_toc(items) %}
                 <ul class="toc-list">
                 {% for item in items %}
+                    {% set target_page = toc_page_map.get(item.file_href) %}
                     <li class="toc-item">
-                        <a href="#" onclick="findAndGo('{{ item.file_href }}'); return false;" class="toc-link">
-                            {{ item.title }}
-                        </a>
+                        {% if target_page %}
+                            <a href="/read/{{ book_id|urlencode }}?page={{ target_page }}" class="toc-link {% if current_page == target_page %}active{% endif %}">
+                                {{ item.title }}
+                            </a>
+                        {% else %}
+                            <span class="toc-link">{{ item.title }}</span>
+                        {% endif %}
                         {% if item.children %}
                             {{ render_toc(item.children) }}
                         {% endif %}
@@ -519,71 +496,69 @@
 
         <button type="button" class="scrim" id="sidebar-scrim" aria-label="Close contents"></button>
 
-        <main id="main">
-            <div class="page-frame">
-                <div class="page-viewport">
-                    <div class="page-track" id="page-track">
-                        <article class="book-content" id="book-content">
-                            {% for chapter in book.spine %}
-                                <section
-                                    class="book-section"
-                                    id="section-{{ chapter.order }}"
-                                    data-section-index="{{ chapter.order }}"
-                                    data-href="{{ chapter.href }}"
-                                >
-                                    {{ chapter.content | safe }}
-                                </section>
-                            {% endfor %}
-                        </article>
-                    </div>
-                </div>
+        <main class="page-stage">
+            <div class="page-card" id="page-card">
+                <article class="book-content" id="book-content">
+                    {{ current_page_html | safe }}
+                </article>
+            </div>
 
-                <div class="page-nav" aria-hidden="true">
-                    <button type="button" class="nav-zone prev" id="prev-zone">
+            <div class="page-nav" aria-hidden="true">
+                {% if prev_page %}
+                    <a href="/read/{{ book_id|urlencode }}?page={{ prev_page }}" class="nav-zone prev" id="prev-zone">
                         <span class="nav-label">Previous</span>
-                    </button>
-                    <button type="button" class="nav-zone next" id="next-zone">
+                    </a>
+                {% else %}
+                    <div class="nav-zone prev disabled">
+                        <span class="nav-label">Previous</span>
+                    </div>
+                {% endif %}
+
+                {% if next_page %}
+                    <a href="/read/{{ book_id|urlencode }}?page={{ next_page }}" class="nav-zone next" id="next-zone">
                         <span class="nav-label">Next</span>
-                    </button>
-                </div>
+                    </a>
+                {% else %}
+                    <div class="nav-zone next disabled">
+                        <span class="nav-label">Next</span>
+                    </div>
+                {% endif %}
             </div>
         </main>
 
         <div class="status-bar">
-            <span id="page-indicator">1 / 1</span>
+            <span id="page-indicator">{{ current_page }} / {{ total_pages }}</span>
         </div>
 
         <div class="reader-toast" id="reader-toast" role="status" aria-live="polite"></div>
+        <div class="meaning-tooltip" id="meaning-tooltip" role="tooltip" aria-hidden="true">
+            <div class="meaning-tooltip-title">Context meaning</div>
+            <div class="meaning-tooltip-text" id="meaning-tooltip-text"></div>
+        </div>
     </div>
 
     <script>
         const body = document.body;
-        const pageTrack = document.getElementById("page-track");
-        const pageIndicator = document.getElementById("page-indicator");
         const bookContent = document.getElementById("book-content");
+        const pageCard = document.getElementById("page-card");
         const toggleSidebarButton = document.getElementById("toggle-sidebar");
         const closeSidebarButton = document.getElementById("close-sidebar");
         const sidebarScrim = document.getElementById("sidebar-scrim");
-        const prevZone = document.getElementById("prev-zone");
-        const nextZone = document.getElementById("next-zone");
         const saveWordButton = document.getElementById("save-word-btn");
         const readerToast = document.getElementById("reader-toast");
-        const sectionElements = Array.from(document.querySelectorAll(".book-section"));
-        const sectionByHref = new Map(sectionElements.map((section) => [section.dataset.href, section]));
+        const prevZone = document.getElementById("prev-zone");
+        const nextZone = document.getElementById("next-zone");
+        const meaningTooltip = document.getElementById("meaning-tooltip");
+        const meaningTooltipText = document.getElementById("meaning-tooltip-text");
         const bookId = "{{ book_id }}";
-        const urlParams = new URLSearchParams(window.location.search);
+        const currentPage = {{ current_page }};
+        const currentChapterIndex = {{ current_chapter_index }};
         const progressStorageKey = "reader3-progress:" + bookId;
-
-        let pageWidth = 1;
-        let pageCount = 1;
-        let pageStep = 1;
-        let currentPage = 1;
-        let targetPage = 1;
-        let settleScrollTimer = null;
-        let toastTimer = null;
-        let persistTimer = null;
-        let restoreAttempts = 0;
         const savedWords = new Set();
+        const savedWordMeanings = new Map();
+        const explanationFetches = new Map();
+        let toastTimer = null;
+        let activeMeaningTarget = null;
 
         function openSidebar() {
             body.classList.add("sidebar-open");
@@ -597,26 +572,10 @@
             body.classList.toggle("sidebar-open");
         }
 
-        function readProgress() {
-            try {
-                const raw = window.localStorage.getItem(progressStorageKey);
-                if (!raw) {
-                    return { page: 1 };
-                }
-                const parsed = JSON.parse(raw);
-                if (!parsed || !Number.isInteger(parsed.page) || parsed.page < 1) {
-                    return { page: 1 };
-                }
-                return parsed;
-            } catch (error) {
-                return { page: 1 };
-            }
-        }
-
-        function rememberReadingPosition(pageNumber = currentPageNumber()) {
+        function rememberReadingPosition() {
             try {
                 window.localStorage.setItem(progressStorageKey, JSON.stringify({
-                    page: Math.max(1, pageNumber),
+                    page: currentPage,
                     updated_at: Date.now()
                 }));
             } catch (error) {
@@ -624,51 +583,31 @@
             }
         }
 
-        function scheduleRememberReadingPosition() {
-            if (persistTimer) {
-                window.clearTimeout(persistTimer);
-            }
-
-            persistTimer = window.setTimeout(() => {
+        function maybeRedirectToSavedPage() {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has("page")) {
                 rememberReadingPosition();
-            }, 120);
-        }
-
-        function clampPage(pageNumber) {
-            return Math.max(1, Math.min(pageNumber, pageCount));
-        }
-
-        function maxScrollLeft() {
-            return Math.max(0, pageTrack.scrollWidth - pageTrack.clientWidth);
-        }
-
-        function pageTolerance() {
-            return Math.max(2, pageStep * 0.05);
-        }
-
-        function computePageCount() {
-            const reachableWidth = maxScrollLeft();
-            if (reachableWidth <= pageTolerance()) {
-                return 1;
+                return false;
             }
 
-            const fullSteps = Math.floor(reachableWidth / pageStep);
-            const remainder = reachableWidth - (fullSteps * pageStep);
-            return fullSteps + 1 + (remainder > pageTolerance() ? 1 : 0);
-        }
+            try {
+                const raw = window.localStorage.getItem(progressStorageKey);
+                if (!raw) {
+                    rememberReadingPosition();
+                    return false;
+                }
+                const parsed = JSON.parse(raw);
+                if (parsed && Number.isInteger(parsed.page) && parsed.page > 1) {
+                    url.searchParams.set("page", String(parsed.page));
+                    window.location.replace(url.toString());
+                    return true;
+                }
+            } catch (error) {
+                // Ignore storage failures.
+            }
 
-        function isAtFirstPageBoundary() {
-            return pageTrack.scrollLeft <= pageTolerance();
-        }
-
-        function isAtLastPageBoundary() {
-            return maxScrollLeft() - pageTrack.scrollLeft <= pageTolerance();
-        }
-
-        function updatePageIndicator() {
-            pageIndicator.textContent = currentPage + " / " + pageCount;
-            prevZone.classList.toggle("disabled", currentPage <= 1);
-            nextZone.classList.toggle("disabled", currentPage >= pageCount);
+            rememberReadingPosition();
+            return false;
         }
 
         function showToast(message, isError = false) {
@@ -730,14 +669,57 @@
             return nodes;
         }
 
-        function savedWordKey(sectionIndex, word) {
-            return sectionIndex + ":" + normalizeWord(word);
+        function savedWordKey(chapterIndex, pageNumber, word) {
+            return chapterIndex + ":" + pageNumber + ":" + normalizeWord(word);
         }
 
-        function highlightWord(word, scope = bookContent, sectionIndex = "book") {
+        function extractContextMeaning(aiExplanation) {
+            if (!aiExplanation) {
+                return "";
+            }
+
+            const template = document.createElement("template");
+            template.innerHTML = aiExplanation;
+            const blocks = template.content.querySelectorAll(".meaning-block");
+
+            for (const block of blocks) {
+                const title = cleanText(block.querySelector(".meaning-title")?.textContent || "");
+                if (title.toLocaleLowerCase() !== "context meaning") {
+                    continue;
+                }
+
+                return cleanText(block.querySelector(".meaning-text")?.textContent || "");
+            }
+
+            return cleanText(template.content.textContent || "");
+        }
+
+        function rememberSavedWordEntry(entry, chapterIndex = currentChapterIndex) {
+            const pageNumber = entry.page_number ?? currentPage;
+            const key = savedWordKey(chapterIndex, pageNumber, entry.word);
+            savedWords.add(key);
+
+            const contextMeaning = extractContextMeaning(entry.ai_explanation || "");
+            if (contextMeaning) {
+                savedWordMeanings.set(key, contextMeaning);
+            }
+
+            return key;
+        }
+
+        function refreshHighlightedWordMetadata(scope = bookContent) {
+            scope.querySelectorAll(".saved-word").forEach((mark) => {
+                const key = savedWordKey(currentChapterIndex, currentPage, mark.dataset.word || mark.textContent);
+                mark.dataset.key = key;
+                mark.dataset.hasMeaning = savedWordMeanings.has(key) ? "true" : "false";
+            });
+        }
+
+        function highlightWord(word, scope = bookContent, chapterIndex = currentChapterIndex, pageNumber = currentPage) {
             const normalized = normalizeWord(word);
             const pattern = buildWordPattern(word);
             const textNodes = textNodesForHighlighting(scope);
+            const key = savedWordKey(chapterIndex, pageNumber, normalized);
             let foundMatch = false;
 
             for (const textNode of textNodes) {
@@ -764,6 +746,8 @@
                     const mark = document.createElement("span");
                     mark.className = "saved-word";
                     mark.dataset.word = normalized;
+                    mark.dataset.key = key;
+                    mark.dataset.hasMeaning = savedWordMeanings.has(key) ? "true" : "false";
                     mark.textContent = matchedWord;
                     fragment.appendChild(mark);
 
@@ -780,7 +764,91 @@
             }
 
             if (foundMatch) {
-                savedWords.add(savedWordKey(sectionIndex, normalized));
+                savedWords.add(key);
+            }
+        }
+
+        function positionMeaningTooltip(target) {
+            const targetRect = target.getBoundingClientRect();
+            const tooltipRect = meaningTooltip.getBoundingClientRect();
+            const margin = 12;
+            const topCandidate = targetRect.top - tooltipRect.height - margin;
+            const top = topCandidate >= margin
+                ? topCandidate
+                : Math.min(window.innerHeight - tooltipRect.height - margin, targetRect.bottom + margin);
+            const left = Math.min(
+                window.innerWidth - tooltipRect.width - margin,
+                Math.max(margin, targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2))
+            );
+
+            meaningTooltip.style.top = Math.max(margin, top) + "px";
+            meaningTooltip.style.left = left + "px";
+        }
+
+        function showMeaningTooltip(target, text) {
+            activeMeaningTarget = target;
+            meaningTooltipText.textContent = text || "AI explanation is still being generated.";
+            meaningTooltip.classList.add("visible");
+            meaningTooltip.setAttribute("aria-hidden", "false");
+            positionMeaningTooltip(target);
+        }
+
+        function hideMeaningTooltip() {
+            activeMeaningTarget = null;
+            meaningTooltip.classList.remove("visible");
+            meaningTooltip.setAttribute("aria-hidden", "true");
+        }
+
+        async function refreshSavedWordMeanings() {
+            const fetchKey = currentChapterIndex + ":" + currentPage;
+            if (explanationFetches.has(fetchKey)) {
+                return explanationFetches.get(fetchKey);
+            }
+
+            const fetchPromise = fetch(
+                "/api/new-words/"
+                + encodeURIComponent(bookId)
+                + "/"
+                + currentChapterIndex
+                + "?page_number="
+                + encodeURIComponent(currentPage)
+            )
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Saved words could not be loaded.");
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    for (const entry of payload.words) {
+                        rememberSavedWordEntry(entry, currentChapterIndex);
+                    }
+                    refreshHighlightedWordMetadata();
+                    return payload;
+                })
+                .catch((error) => {
+                    console.warn("Saved word meanings could not be refreshed.", error);
+                    return null;
+                })
+                .finally(() => {
+                    explanationFetches.delete(fetchKey);
+                });
+
+            explanationFetches.set(fetchKey, fetchPromise);
+            return fetchPromise;
+        }
+
+        async function handleSavedWordPointerEnter(target) {
+            const key = target.dataset.key || savedWordKey(currentChapterIndex, currentPage, target.dataset.word || target.textContent);
+            showMeaningTooltip(target, savedWordMeanings.get(key));
+
+            if (savedWordMeanings.has(key)) {
+                return;
+            }
+
+            await refreshSavedWordMeanings();
+            if (activeMeaningTarget === target) {
+                showMeaningTooltip(target, savedWordMeanings.get(key));
             }
         }
 
@@ -808,13 +876,6 @@
             return { start, end };
         }
 
-        function selectedSectionElement(range) {
-            const anchor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
-                ? range.commonAncestorContainer.parentElement
-                : range.commonAncestorContainer;
-            return anchor instanceof Element ? anchor.closest(".book-section") : null;
-        }
-
         function selectedWordPayload() {
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
@@ -826,12 +887,27 @@
                 return null;
             }
 
-            const word = selection.toString().trim();
-            if (!/^[\p{L}\p{N}][\p{L}\p{N}'’-]*$/u.test(word)) {
+            const selectedText = selection.toString().trim();
+            if (!selectedText) {
                 return null;
             }
 
-            const section = selectedSectionElement(range);
+            // Split into words and filter valid ones
+            const words = selectedText.split(/\s+/).filter(word =>
+                /^[\p{L}\p{N}][\p{L}\p{N}'’-]*$/u.test(word)
+            );
+
+            if (words.length === 0) {
+                return null;
+            }
+
+            // If more than 1 word, treat as a phrase
+            const isPhrase = words.length > 1;
+            const finalWords = isPhrase ? [selectedText] : words;
+
+            const section = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+                ? range.commonAncestorContainer.parentElement?.closest(".book-section")
+                : range.commonAncestorContainer.closest?.(".book-section");
             if (!section) {
                 return null;
             }
@@ -841,205 +917,116 @@
                 return null;
             }
 
-            const selectedText = cleanText(selection.toString());
-            const matchIndex = sectionText.toLocaleLowerCase().indexOf(selectedText.toLocaleLowerCase());
+            const cleanedSelectedText = cleanText(selection.toString());
+            const matchIndex = sectionText.toLocaleLowerCase().indexOf(cleanedSelectedText.toLocaleLowerCase());
             const bounds = sentenceBounds(sectionText, Math.max(0, matchIndex));
             const sentence = cleanText(sectionText.slice(bounds.start, bounds.end)) || sectionText;
 
             return {
-                word,
+                words: finalWords,
                 sentence,
-                chapterIndex: parseInt(section.dataset.sectionIndex, 10),
+                chapterIndex: parseInt(section.dataset.chapterIndex, 10),
+                pageNumber: currentPage,
                 section,
+                isPhrase,
             };
         }
 
         async function loadSavedWords() {
             try {
-                const response = await fetch("/api/new-words/" + encodeURIComponent(bookId));
+                const response = await fetch(
+                    "/api/new-words/"
+                    + encodeURIComponent(bookId)
+                    + "/"
+                    + currentChapterIndex
+                    + "?page_number="
+                    + encodeURIComponent(currentPage)
+                );
                 if (!response.ok) {
-                    throw new Error("Failed to load words");
+                    console.warn("Saved words could not be loaded.", response.status);
+                    return;
                 }
 
                 const payload = await response.json();
                 for (const entry of payload.words) {
-                    const section = document.getElementById("section-" + entry.chapter_index);
-                    highlightWord(entry.word, section || bookContent, entry.chapter_index);
+                    rememberSavedWordEntry(entry, currentChapterIndex);
+                    highlightWord(entry.word, bookContent, currentChapterIndex, currentPage);
                 }
             } catch (error) {
-                showToast("Couldn't load saved words from PostgreSQL.", true);
+                console.warn("Saved words could not be loaded.", error);
             }
         }
 
         async function saveSelectedWord() {
             const payload = selectedWordPayload();
             if (!payload) {
-                showToast("Select a single word in the text, then press n or click New Words.", true);
+                showToast("Select one or more words in the page, then press n or click New Words.", true);
                 return;
             }
 
-            const wordKey = savedWordKey(payload.chapterIndex, payload.word);
-            if (savedWords.has(wordKey)) {
-                showToast("\"" + payload.word + "\" is already saved.");
-                return;
-            }
-
-            try {
-                const response = await fetch("/api/new-words", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        book_id: bookId,
-                        chapter_index: payload.chapterIndex,
-                        page_number: currentPageNumber(),
-                        sentence: payload.sentence,
-                        word: payload.word
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error("Failed to save word");
+            const wordsToSave = [];
+            for (const word of payload.words) {
+                const wordKey = savedWordKey(payload.chapterIndex, payload.pageNumber, word);
+                if (!savedWords.has(wordKey)) {
+                    wordsToSave.push(word);
                 }
+            }
 
-                highlightWord(payload.word, payload.section, payload.chapterIndex);
-                const selection = window.getSelection();
-                if (selection) {
-                    selection.removeAllRanges();
+            if (wordsToSave.length === 0) {
+                const itemType = payload.isPhrase ? "phrase" : "word";
+                showToast(`Selected ${itemType} is already saved.`);
+                return;
+            }
+
+            let savedCount = 0;
+            let aiPendingCount = 0;
+
+            for (const word of wordsToSave) {
+                try {
+                    const response = await fetch("/api/new-words", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            book_id: bookId,
+                            chapter_index: payload.chapterIndex,
+                            page_number: payload.pageNumber,
+                            sentence: payload.sentence,
+                            word: word
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Failed to save word");
+                    }
+
+                    const savedEntry = await response.json();
+                    rememberSavedWordEntry(savedEntry, payload.chapterIndex);
+                    highlightWord(word, payload.section, payload.chapterIndex, payload.pageNumber);
+                    savedCount++;
+
+                    if (savedEntry.ai_explanation_pending) {
+                        aiPendingCount++;
+                    }
+                } catch (error) {
+                    console.error(`Failed to save word "${word}":`, error);
                 }
-                showToast("Saved \"" + payload.word + "\" to New Words.");
-            } catch (error) {
-                showToast("Couldn't save that word to PostgreSQL.", true);
-            }
-        }
-
-        function syncCurrentPageFromScroll() {
-            if (isAtFirstPageBoundary()) {
-                currentPage = 1;
-                targetPage = 1;
-                updatePageIndicator();
-                return;
             }
 
-            if (isAtLastPageBoundary()) {
-                currentPage = pageCount;
-                targetPage = pageCount;
-                updatePageIndicator();
-                return;
+            const selection = window.getSelection();
+            if (selection) {
+                selection.removeAllRanges();
             }
 
-            currentPage = clampPage(Math.round(pageTrack.scrollLeft / pageStep) + 1);
-            if (Math.abs(pageTrack.scrollLeft - ((targetPage - 1) * pageStep)) < 2) {
-                currentPage = targetPage;
-            }
-            updatePageIndicator();
-        }
-
-        function updatePagination() {
-            pageWidth = pageTrack.clientWidth;
-            if (pageWidth <= 0) {
-                pageWidth = 1;
-            }
-
-            const computedStyles = window.getComputedStyle(pageTrack);
-            const paddingLeft = parseFloat(computedStyles.paddingLeft) || 0;
-            const paddingRight = parseFloat(computedStyles.paddingRight) || 0;
-            const columnGap = parseFloat(computedStyles.columnGap) || 0;
-            const columnWidth = Math.max(240, pageWidth - paddingLeft - paddingRight);
-            pageTrack.style.setProperty("--page-column-width", columnWidth + "px");
-            pageStep = columnWidth + columnGap;
-
-            pageCount = computePageCount();
-            currentPage = clampPage(currentPage);
-            targetPage = clampPage(targetPage);
-            syncCurrentPageFromScroll();
-        }
-
-        function scrollToPage(pageNumber, behavior = "smooth") {
-            const clampedPage = clampPage(pageNumber);
-            const targetLeft = Math.min(maxScrollLeft(), (clampedPage - 1) * pageStep);
-            targetPage = clampedPage;
-            currentPage = clampedPage;
-            updatePageIndicator();
-
-            if (settleScrollTimer) {
-                window.clearTimeout(settleScrollTimer);
-            }
-
-            pageTrack.scrollTo({
-                left: targetLeft,
-                behavior
-            });
-
-            settleScrollTimer = window.setTimeout(() => {
-                const snappedPage = clampPage(Math.round(pageTrack.scrollLeft / pageStep) + 1);
-                currentPage = snappedPage === targetPage ? targetPage : snappedPage;
-                updatePageIndicator();
-                rememberReadingPosition(currentPage);
-            }, 220);
-        }
-
-        function currentPageNumber() {
-            if (isAtFirstPageBoundary()) {
-                return 1;
-            }
-
-            if (isAtLastPageBoundary()) {
-                return pageCount;
-            }
-
-            return clampPage(Math.max(currentPage, targetPage));
-        }
-
-        function goToPreviousPage() {
-            if (currentPageNumber() > 1) {
-                scrollToPage(currentPageNumber() - 1);
-            }
-        }
-
-        function goToNextPage() {
-            if (currentPageNumber() < pageCount) {
-                scrollToPage(currentPageNumber() + 1);
-            }
-        }
-
-        function pageForElement(element) {
-            const trackRect = pageTrack.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            const absoluteLeft = pageTrack.scrollLeft + (elementRect.left - trackRect.left);
-            return clampPage(Math.floor(Math.max(0, absoluteLeft) / pageStep) + 1);
-        }
-
-        function findAndGo(filename) {
-            const cleanFile = filename.split("#")[0];
-            const section = sectionByHref.get(cleanFile);
-
-            if (section) {
-                closeSidebar();
-                scrollToPage(pageForElement(section), "auto");
-                rememberReadingPosition(currentPageNumber());
+            if (savedCount === 0) {
+                showToast("Failed to save.", true);
             } else {
-                console.log("Could not find section for", filename);
-            }
-        }
-
-        function requestedInitialPage() {
-            const requestedPage = urlParams.get("page");
-            if (requestedPage && /^\d+$/.test(requestedPage)) {
-                return parseInt(requestedPage, 10);
-            }
-            return readProgress().page || 1;
-        }
-
-        function restoreInitialPosition() {
-            updatePagination();
-            const wantedPage = requestedInitialPage();
-            scrollToPage(wantedPage, "auto");
-            rememberReadingPosition(wantedPage);
-            restoreAttempts += 1;
-            if (restoreAttempts < 4) {
-                window.setTimeout(restoreInitialPosition, restoreAttempts === 1 ? 120 : 260);
+                const itemType = payload.isPhrase ? "phrase" : (savedCount === 1 ? "word" : "words");
+                const message = aiPendingCount > 0
+                    ? `Saved ${itemType}. AI explanation is being generated in the background.`
+                    : `Saved ${itemType} to New Words.`;
+                showToast(message);
             }
         }
 
@@ -1047,34 +1034,25 @@
         closeSidebarButton.addEventListener("click", closeSidebar);
         sidebarScrim.addEventListener("click", closeSidebar);
         saveWordButton.addEventListener("click", saveSelectedWord);
-        prevZone.addEventListener("click", goToPreviousPage);
-        nextZone.addEventListener("click", goToNextPage);
-
-        pageTrack.addEventListener("scroll", () => {
-            syncCurrentPageFromScroll();
-            scheduleRememberReadingPosition();
-        }, { passive: true });
-
-        window.addEventListener("resize", () => {
-            const previousPage = currentPageNumber();
-            updatePagination();
-            scrollToPage(previousPage, "auto");
-            rememberReadingPosition(previousPage);
-        });
-
-        window.addEventListener("pagehide", () => {
-            rememberReadingPosition();
-        });
-
-        window.addEventListener("beforeunload", () => {
-            rememberReadingPosition();
-        });
-
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "hidden") {
-                rememberReadingPosition();
+        bookContent.addEventListener("pointerover", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
+            if (!target || !bookContent.contains(target)) {
+                return;
             }
+
+            handleSavedWordPointerEnter(target);
         });
+        bookContent.addEventListener("pointerout", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
+            const nextTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
+            if (!target || (nextTarget && target.contains(nextTarget))) {
+                return;
+            }
+
+            hideMeaningTooltip();
+        });
+        window.addEventListener("scroll", hideMeaningTooltip, true);
+        window.addEventListener("resize", hideMeaningTooltip);
 
         document.addEventListener("keydown", (event) => {
             const target = event.target;
@@ -1094,13 +1072,19 @@
             }
 
             if (event.key === "ArrowLeft") {
-                event.preventDefault();
-                goToPreviousPage();
+                if (prevZone) {
+                    event.preventDefault();
+                    window.location.href = prevZone.href;
+                }
+                return;
             }
 
-            if (event.key === "ArrowRight" || event.key === " ") {
-                event.preventDefault();
-                goToNextPage();
+            if (event.key === "ArrowRight") {
+                if (nextZone) {
+                    event.preventDefault();
+                    window.location.href = nextZone.href;
+                }
+                return;
             }
 
             if (event.key.toLowerCase() === "n" && !event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -1109,16 +1093,10 @@
             }
         });
 
-        window.addEventListener("load", async () => {
-            restoreInitialPosition();
-            for (const image of bookContent.querySelectorAll("img")) {
-                if (!image.complete) {
-                    image.addEventListener("load", restoreInitialPosition, { once: true });
-                    image.addEventListener("error", restoreInitialPosition, { once: true });
-                }
-            }
-            await loadSavedWords();
-        });
+        if (!maybeRedirectToSavedPage()) {
+            rememberReadingPosition();
+            loadSavedWords();
+        }
     </script>
 </body>
 </html>

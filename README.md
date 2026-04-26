@@ -22,6 +22,34 @@ uv run server.py
 
 And visit [localhost:8123](http://localhost:8123/) to see your current Library. You can easily add more books, or delete them from your library by deleting the folder. It's not supposed to be complicated or complex.
 
+## OpenAI word translation
+
+When you select one or more words in the reader and click `New Words`, the app can now ask OpenAI for explanations and save them into the vocabulary list. Select a single word to save it individually, or select multiple words to save the entire phrase as one entry.
+
+1. Install the updated dependencies:
+
+```bash
+uv sync
+```
+
+2. Create an API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+
+3. Put your key into `.env` in the project root:
+
+```env
+OPENAI_API_KEY=your_api_key_here
+READER3_TRANSLATION_TARGET_LANGUAGE=English
+READER3_OPENAI_MODEL=gpt-5-mini
+```
+
+4. Start the server:
+
+```bash
+uv run server.py
+```
+
+The app now auto-loads `.env`. If `OPENAI_API_KEY` is missing, it still works and saves the words, but skips the translation.
+
 ## License
 
 MIT
@@ -32,3 +60,14 @@ uv run server.py
 
 then open http://127.0.0.1:8123
 
+Delete all of the words in database:
+psql postgresql:///reader3 -c "TRUNCATE TABLE new_words RESTART IDENTITY;"
+
+
+- retart:
+cd /Users/charliem/VSCode/github_projects/reader3
+uv sync
+DATABASE_URL="postgresql:///reader3" uv run python server.py
+
+
+- how to add a book

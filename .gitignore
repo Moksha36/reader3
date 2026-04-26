@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# Local environment secrets
+.env
+.env.local
+
 # Custom
 *_data/
 *.epub

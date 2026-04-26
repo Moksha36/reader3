@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --panel: rgba(10, 10, 10, 0.9);
+            --panel-strong: rgba(9, 9, 9, 0.96);
+            --panel-border: rgba(255, 255, 255, 0.09);
+            --text: rgba(250, 248, 244, 0.96);
+            --muted: rgba(220, 214, 204, 0.68);
+            --accent: #f2e4bc;
+            --accent-strong: #f7c45f;
+            --danger: #e5a6a6;
+            --shadow: 0 28px 80px rgba(0, 0, 0, 0.4);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background:
+                radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 34%),
+                radial-gradient(circle at bottom, rgba(255, 255, 255, 0.03), transparent 42%),
+                var(--bg);
+            color: var(--text);
+            font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        }
+
+        body {
+            padding: clamp(1rem, 3vw, 2rem);
+        }
+
+        button,
+        input,
+        textarea,
+        select {
+            font: inherit;
+        }
+
+        .shell {
+            position: relative;
+            min-height: calc(100vh - 2rem);
+            border: 1px solid var(--panel-border);
+            border-radius: 32px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 26%),
+                rgba(5, 5, 5, 0.92);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .shell::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 14% 18%, rgba(242, 228, 188, 0.09), transparent 28%),
+                radial-gradient(circle at 84% 10%, rgba(255, 255, 255, 0.05), transparent 26%);
+            pointer-events: none;
+        }
+
+        .inner {
+            position: relative;
+            padding: clamp(1.25rem, 4vw, 3rem);
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .pill,
+        .action-btn,
+        .nav-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0.72rem 1rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 999px;
+            background: var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.04em;
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+            cursor: pointer;
+        }
+
+        .pill:hover,
+        .pill:focus-visible,
+        .action-btn:hover,
+        .action-btn:focus-visible,
+        .nav-btn:hover,
+        .nav-btn:focus-visible,
+        .flashcard:focus-visible {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(24, 24, 24, 0.94);
+            outline: none;
+        }
+
+        .pill.is-accent,
+        .action-btn.is-accent {
+            color: var(--accent);
+            border-color: rgba(242, 228, 188, 0.26);
+        }
+
+        .action-btn.is-danger {
+            color: var(--danger);
+            border-color: rgba(229, 166, 166, 0.24);
+        }
+
+        .eyebrow,
+        .hero-copy,
+        .stat-label,
+        .study-copy,
+        .card-meta,
+        .card-tip,
+        .empty,
+        .card-back,
+        .shortcut {
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .study-panel,
+        .empty {
+            position: relative;
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            background: var(--panel-strong);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            padding: 1.4rem;
+        }
+
+        .stat-label,
+        .card-meta {
+            color: var(--muted);
+            font-size: 0.84rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .study-panel {
+            min-height: calc(100vh - 12rem);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .study-dock {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            max-width: 780px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .study-copy {
+            color: var(--muted);
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .study-stage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            color: var(--muted);
+        }
+
+        .progress {
+            width: min(220px, 42vw);
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0;
+            border-radius: inherit;
+            background: linear-gradient(90deg, rgba(242, 228, 188, 0.72), rgba(247, 196, 95, 0.96));
+            transition: width 0.25s ease;
+        }
+
+        .reviewer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 0;
+        }
+
+        .flashcard {
+            position: relative;
+            width: min(100%, 760px);
+            min-height: 520px;
+            border: 1px solid var(--panel-border);
+            border-radius: 30px;
+            background: transparent;
+            cursor: pointer;
+            perspective: 1600px;
+        }
+
+        .flashcard[hidden],
+        .empty[hidden] {
+            display: none;
+        }
+
+        .flashcard-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 520px;
+            transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .flashcard.is-flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            overflow: hidden;
+            backface-visibility: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .card-front {
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 26%),
+                rgba(10, 10, 10, 0.96);
+        }
+
+        .card-front-top,
+        .card-front-bottom {
+            flex: 1 1 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .card-front-top {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background:
+                radial-gradient(circle at top left, rgba(242, 228, 188, 0.12), transparent 48%),
+                rgba(255, 255, 255, 0.02);
+        }
+
+        .card-front-bottom {
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+                rgba(0, 0, 0, 0.18);
+        }
+
+        .word {
+            margin: 0;
+            font-size: clamp(2.3rem, 5vw, 4.4rem);
+            line-height: 0.98;
+            letter-spacing: -0.04em;
+            color: #fffdf8;
+            text-align: center;
+            word-break: break-word;
+        }
+
+        .sentence {
+            margin: 0;
+            font-size: clamp(1rem, 1.8vw, 1.1rem);
+            line-height: 1.8;
+            color: var(--text);
+        }
+
+        .sentence mark {
+            padding: 0.1em 0.22em;
+            border-radius: 0.35em;
+            background: rgba(247, 196, 95, 0.24);
+            color: #fff4cf;
+            box-shadow: 0 0 0 1px rgba(247, 196, 95, 0.16);
+        }
+
+        .card-tip {
+            margin-top: auto;
+            color: var(--muted);
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .card-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.4rem 1.6rem;
+            background:
+                radial-gradient(circle at top, rgba(242, 228, 188, 0.1), transparent 38%),
+                rgba(10, 10, 10, 0.97);
+            transform: rotateY(180deg);
+        }
+
+        .card-back-inner {
+            width: 100%;
+            max-width: 1100px;
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            gap: 0.7rem;
+        }
+
+        .card-back-word {
+            margin: 0 0 0.8rem 0;
+            font-size: clamp(2rem, 3.8vw, 3.4rem);
+            line-height: 1.02;
+            letter-spacing: -0.04em;
+            color: #fffdf8;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-weight: 800;
+        }
+
+        .card-back-content {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            color: var(--text);
+        }
+
+        .card-back-content .meaning-block {
+            width: 100%;
+            margin: 0.35rem 0 0.75rem 0;
+        }
+
+        .card-back-content .meaning-title,
+        .card-back-content center {
+            display: block;
+            width: 100%;
+            margin: 0 0 0.3rem 0;
+            text-align: center;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: clamp(1rem, 1.6vw, 1.3rem);
+            line-height: 1.2;
+            font-weight: 700;
+            color: #f3f0e8;
+        }
+
+        .card-back-content .meaning-text,
+        .card-back-content p {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0;
+            text-align: center;
+            line-height: 1.3;
+            color: var(--text);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: clamp(0.88rem, 1.3vw, 1.08rem);
+            white-space: normal;
+        }
+
+        .card-back-content .meaning-list,
+        .card-back-content ol,
+        .card-back-content ul {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0.2rem 0 0 0;
+            padding: 0;
+            list-style-position: inside;
+            text-align: center;
+        }
+
+        .card-back-content .meaning-list li,
+        .card-back-content li {
+            margin: 0.18rem 0;
+            font-size: clamp(0.88rem, 1.3vw, 1.08rem);
+            line-height: 1.3;
+            text-align: center;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+        }
+
+        .review-controls,
+        .shortcut-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+        }
+
+        .nav-btn[disabled] {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0.72rem 1rem;
+            border-radius: 999px;
+            border: 1px solid rgba(242, 228, 188, 0.22);
+            background: rgba(242, 228, 188, 0.08);
+            color: var(--accent);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.84rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .shortcut {
+            color: var(--muted);
+            font-size: 0.84rem;
+            letter-spacing: 0.02em;
+        }
+
+        .shortcut kbd {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.8rem;
+            min-height: 1.8rem;
+            margin: 0 0.2rem;
+            padding: 0 0.45rem;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 0.5rem;
+            background: rgba(255, 255, 255, 0.04);
+            color: #fffdf8;
+            font-size: 0.78rem;
+        }
+
+        .empty {
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 0.8rem;
+            }
+
+            .shell {
+                min-height: calc(100vh - 1.6rem);
+                border-radius: 24px;
+            }
+
+            .inner {
+                padding: 1.1rem;
+            }
+
+            .topbar,
+            .study-dock {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .nav {
+                width: 100%;
+            }
+
+            .progress {
+                width: 100%;
+            }
+
+            .study-copy {
+                text-align: left;
+            }
+
+            .flashcard,
+            .flashcard-inner {
+                min-height: 440px;
+            }
+
+            .card-front-top,
+            .card-front-bottom,
+            .card-back {
+                padding: 1.15rem;
+            }
+
+            .card-back-word {
+                font-size: clamp(1.8rem, 8vw, 2.4rem);
+            }
+
+            .card-back-content .meaning-title,
+            .card-back-content center {
+                font-size: clamp(0.95rem, 4.6vw, 1.15rem);
+            }
+
+            .card-back-content .meaning-text,
+            .card-back-content p,
+            .card-back-content .meaning-list li,
+            .card-back-content li {
+                font-size: clamp(0.84rem, 3.9vw, 1rem);
+                line-height: 1.28;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="inner">
+            <div class="topbar">
+                <div class="nav">
+                    <a href="/" class="pill">Library</a>
+                    {% if book_id %}
+                        <a href="/read/{{ book_id }}" class="pill">Back To Reader</a>
+                    {% endif %}
+                    <a href="/vocabulary{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Words Stats</a>
+                    <a href="/vocabulary/flashcards{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill is-accent">Flashcards</a>
+                    <a href="/vocabulary/export{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Export CSV</a>
+                </div>
+            </div>
+
+            {% if not flashcards %}
+                <div class="empty">
+                    No saved words yet. Mark words while reading first, then come back here to study them as flashcards.
+                </div>
+            {% else %}
+                <section class="study-panel">
+                    <div class="reviewer">
+                        {% for entry in flashcards %}
+                            <button
+                                type="button"
+                                class="flashcard{% if loop.index0 == 0 %} is-active{% endif %}"
+                                data-index="{{ loop.index0 }}"
+                                data-word-id="{{ entry.id }}"
+                                data-memorized="{{ 'true' if entry.memorized else 'false' }}"
+                                aria-label="Flip flashcard for {{ entry.word|e }}"
+                                {% if loop.index0 != 0 %}hidden{% endif %}
+                            >
+                                <div class="flashcard-inner">
+                                    <article class="card-face card-front">
+                                        <div class="card-front-top">
+                                            <div class="card-meta">{{ entry.book_title }} · Page {{ entry.page_number }}</div>
+                                            <h2 class="word">{{ entry.word }}</h2>
+                                        </div>
+                                        <div class="card-front-bottom">
+                                            <p class="sentence">{{ entry.highlighted_sentence | safe }}</p>
+                                            <div class="card-tip">Space or Enter to flip</div>
+                                        </div>
+                                    </article>
+                                    <article class="card-face card-back">
+                                        <div class="card-back-inner">
+                                            <div class="card-meta">{{ entry.book_title }} · Explanation</div>
+                                            <h2 class="card-back-word">{{ entry.word }}</h2>
+
+                                            <div class="card-back-content">
+                                                {% if entry.ai_explanation %}
+                                                    {{ entry.ai_explanation | safe }}
+                                                {% else %}
+                                                    <div class="meaning-block">
+                                                        <div class="meaning-title">Context meaning</div>
+                                                        <div class="meaning-text">No AI explanation was saved for this word yet.</div>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+
+                                            <div class="card-tip">Space or Enter to flip back</div>
+                                        </div>
+                                    </article>
+                                </div>
+                            </button>
+                        {% endfor %}
+                    </div>
+
+                    <div class="study-dock">
+                        <div class="study-copy">
+                            <div id="studyCounter">Card 1 of {{ total_count }}</div>
+                            <div id="studyStatus">Front side</div>
+                            <div class="hero-copy">{% if book_title %}{{ book_title }}{% else %}Vocabulary Flashcards{% endif %}</div>
+                        </div>
+                        <div class="study-stage">
+                            <div class="progress" aria-hidden="true">
+                                <div class="progress-bar" id="progressBar"></div>
+                            </div>
+                            <span class="status-pill" id="memorizedBadge">Reviewing</span>
+                        </div>
+                        <div class="review-controls">
+                            <button type="button" class="nav-btn" id="prevCard">Previous</button>
+                            <button type="button" class="nav-btn" id="flipCard">Flip</button>
+                            <button type="button" class="nav-btn" id="nextCard">Next</button>
+
+                            <form method="post" action="/vocabulary/toggle" id="againForm">
+                                <input type="hidden" name="word_id" id="againWordId" value="{{ flashcards[0].id }}">
+                                <input type="hidden" name="memorized" value="false">
+                                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                <button type="submit" class="action-btn is-danger">Again</button>
+                            </form>
+
+                            <form method="post" action="/vocabulary/toggle" id="memorizedForm">
+                                <input type="hidden" name="word_id" id="memorizedWordId" value="{{ flashcards[0].id }}">
+                                <input type="hidden" name="memorized" value="true">
+                                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                <button type="submit" class="action-btn is-accent">Remembered</button>
+                            </form>
+                        </div>
+
+                        <div class="shortcut-row">
+                            <span class="shortcut"><kbd>Space</kbd> or <kbd>Enter</kbd> flip card</span>
+                            <span class="shortcut"><kbd>←</kbd> previous</span>
+                            <span class="shortcut"><kbd>→</kbd> next</span>
+                            <span class="shortcut"><kbd>A</kbd> again</span>
+                            <span class="shortcut"><kbd>R</kbd> remembered</span>
+                        </div>
+                    </div>
+                </section>
+            {% endif %}
+        </div>
+    </main>
+
+    {% if flashcards %}
+        <script>
+            const cards = Array.from(document.querySelectorAll(".flashcard"));
+            const studyCounter = document.getElementById("studyCounter");
+            const studyStatus = document.getElementById("studyStatus");
+            const memorizedBadge = document.getElementById("memorizedBadge");
+            const progressBar = document.getElementById("progressBar");
+            const prevCardButton = document.getElementById("prevCard");
+            const nextCardButton = document.getElementById("nextCard");
+            const flipCardButton = document.getElementById("flipCard");
+            const againWordId = document.getElementById("againWordId");
+            const memorizedWordId = document.getElementById("memorizedWordId");
+            const againForm = document.getElementById("againForm");
+            const memorizedForm = document.getElementById("memorizedForm");
+
+            let currentIndex = 0;
+
+            function currentCard() {
+                return cards[currentIndex];
+            }
+
+            function setActiveCard(nextIndex) {
+                cards[currentIndex].hidden = true;
+                cards[currentIndex].classList.remove("is-active");
+
+                currentIndex = nextIndex;
+
+                const card = currentCard();
+                card.hidden = false;
+                card.classList.add("is-active");
+                card.focus({ preventScroll: true });
+                updateUi();
+            }
+
+            function flipCurrentCard() {
+                currentCard().classList.toggle("is-flipped");
+                updateUi();
+            }
+
+            function updateUi() {
+                const card = currentCard();
+                const isFlipped = card.classList.contains("is-flipped");
+                const isMemorized = card.dataset.memorized === "true";
+                const cardNumber = currentIndex + 1;
+
+                studyCounter.textContent = `Card ${cardNumber} of ${cards.length}`;
+                studyStatus.textContent = isFlipped ? "Back side" : "Front side";
+                memorizedBadge.textContent = isMemorized ? "Memorized" : "Reviewing";
+                progressBar.style.width = `${(cardNumber / cards.length) * 100}%`;
+                prevCardButton.disabled = currentIndex === 0;
+                nextCardButton.disabled = currentIndex === cards.length - 1;
+                syncWordIds();
+            }
+
+            function syncWordIds() {
+                const card = currentCard();
+                const wordId = card.dataset.wordId;
+                againWordId.value = wordId;
+                memorizedWordId.value = wordId;
+            }
+
+            cards.forEach((card) => {
+                card.addEventListener("click", () => {
+                    flipCurrentCard();
+                });
+            });
+
+            prevCardButton.addEventListener("click", () => {
+                if (currentIndex > 0) {
+                    setActiveCard(currentIndex - 1);
+                    syncWordIds();
+                }
+            });
+
+            nextCardButton.addEventListener("click", () => {
+                if (currentIndex < cards.length - 1) {
+                    setActiveCard(currentIndex + 1);
+                    syncWordIds();
+                }
+            });
+
+            flipCardButton.addEventListener("click", () => {
+                flipCurrentCard();
+            });
+
+            document.addEventListener("keydown", (event) => {
+                const tagName = document.activeElement && document.activeElement.tagName;
+                if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") {
+                    return;
+                }
+
+                if (event.key === "ArrowLeft") {
+                    event.preventDefault();
+                    prevCardButton.click();
+                } else if (event.key === "ArrowRight") {
+                    event.preventDefault();
+                    nextCardButton.click();
+                } else if (event.key === " " || event.key === "Enter") {
+                    event.preventDefault();
+                    flipCardButton.click();
+                } else if (event.key.toLowerCase() === "a") {
+                    event.preventDefault();
+                    againForm.submit();
+                } else if (event.key.toLowerCase() === "r") {
+                    event.preventDefault();
+                    memorizedForm.submit();
+                }
+            });
+
+            updateUi();
+        </script>
+    {% endif %}
+</body>
+</html>

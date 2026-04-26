@@ -14,6 +14,7 @@
             --text: rgba(250, 248, 244, 0.96);
             --muted: rgba(220, 214, 204, 0.68);
             --accent: #f2e4bc;
+            --danger: #e5a6a6;
             --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
         }
 
@@ -32,6 +33,11 @@
 
         body {
             padding: clamp(1.25rem, 3vw, 2rem);
+        }
+
+        button,
+        input {
+            font: inherit;
         }
 
         .library-shell {
@@ -68,6 +74,14 @@
             max-width: 820px;
         }
 
+        .hero-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
         .eyebrow {
             display: inline-flex;
             width: fit-content;
@@ -85,6 +99,49 @@
             backdrop-filter: blur(16px);
         }
 
+        .action-btn,
+        .upload-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0.72rem 1rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 999px;
+            background: var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.04em;
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+            cursor: pointer;
+        }
+
+        .action-btn:hover,
+        .action-btn:focus-visible,
+        .upload-btn:hover,
+        .upload-btn:focus-visible,
+        .dropzone:hover,
+        .dropzone:focus-visible {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(24, 24, 24, 0.94);
+            outline: none;
+        }
+
+        .action-btn.is-accent,
+        .upload-btn.is-accent {
+            color: var(--accent);
+            border-color: rgba(242, 228, 188, 0.26);
+        }
+
+        .action-btn[disabled],
+        .upload-btn[disabled] {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
         h1 {
             margin: 0;
             font-size: clamp(3rem, 6vw, 5.8rem);
@@ -93,23 +150,35 @@
             color: #fffdf8;
         }
 
+        .hero-copy,
+        .book-kicker,
+        .book-sections,
+        .book-meta,
+        .empty-state,
+        .modal-copy,
+        .upload-status,
+        .upload-meta {
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
         .hero-copy {
             margin: 0;
             max-width: 56ch;
             color: var(--muted);
-            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-size: clamp(1rem, 0.4vw + 0.95rem, 1.15rem);
             line-height: 1.7;
         }
 
         .book-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: repeat(auto-fill, 180px);
+            justify-content: start;
+            gap: 0.8rem;
         }
 
         .book-card,
-        .empty-state {
+        .empty-state,
+        .modal-card {
             position: relative;
             border: 1px solid var(--panel-border);
             border-radius: 28px;
@@ -119,10 +188,12 @@
         }
 
         .book-card {
+            position: relative;
             display: flex;
             flex-direction: column;
-            min-height: 300px;
-            padding: 1.4rem;
+            width: 180px;
+            min-height: 264px;
+            padding: 0.82rem 0.82rem 0.72rem;
             transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
         }
 
@@ -134,7 +205,8 @@
         }
 
         .book-card::before,
-        .empty-state::before {
+        .empty-state::before,
+        .modal-card::before {
             content: "";
             position: absolute;
             inset: 0;
@@ -142,17 +214,24 @@
             pointer-events: none;
         }
 
+        .book-open {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            text-decoration: none;
+        }
+
         .book-top {
             position: relative;
             display: grid;
-            gap: 0.9rem;
-            margin-bottom: 1.2rem;
+            gap: 0.35rem;
+            margin-bottom: 0.4rem;
+            padding-right: 2.9rem;
         }
 
         .book-kicker,
         .book-sections {
-            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            font-size: 0.78rem;
+            font-size: 0.62rem;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--muted);
@@ -167,44 +246,52 @@
 
         .book-meta {
             position: relative;
-            margin: 0 0 1.5rem;
+            margin: 0;
             color: var(--muted);
-            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            font-size: 0.98rem;
-            line-height: 1.65;
+            font-size: 0.74rem;
+            line-height: 1.3;
+        }
+
+        .book-sections {
+            position: absolute;
+            left: 0.82rem;
+            bottom: 0.72rem;
+            z-index: 2;
         }
 
         .book-actions {
-            position: relative;
-            margin-top: auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
+            position: absolute;
+            top: 0.72rem;
+            right: 0.72rem;
+            z-index: 3;
         }
 
-        .read-link {
+        .delete-form {
+            margin: 0;
+        }
+
+        .delete-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-height: 44px;
-            padding: 0.72rem 1rem;
-            border: 1px solid var(--panel-border);
+            width: 2rem;
+            height: 2rem;
+            border: 1px solid rgba(229, 166, 166, 0.24);
             border-radius: 999px;
-            background: rgba(20, 20, 20, 0.92);
-            color: var(--text);
-            text-decoration: none;
+            background: rgba(16, 16, 16, 0.94);
+            color: var(--danger);
             font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            font-size: 0.88rem;
-            letter-spacing: 0.04em;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
             transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
         }
 
-        .read-link:hover,
-        .read-link:focus-visible {
+        .delete-btn:hover,
+        .delete-btn:focus-visible {
             transform: translateY(-1px);
-            border-color: rgba(255, 255, 255, 0.2);
-            background: rgba(28, 28, 28, 0.98);
+            border-color: rgba(229, 166, 166, 0.46);
+            background: rgba(28, 14, 14, 0.98);
             outline: none;
         }
 
@@ -212,13 +299,165 @@
             padding: 1.6rem;
             margin-top: 1rem;
             color: var(--muted);
-            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             line-height: 1.7;
         }
 
         code {
             color: var(--accent);
-            font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, monospace;
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .modal-backdrop.is-open {
+            display: flex;
+        }
+
+        .modal-card {
+            width: min(100%, 680px);
+            padding: 1.35rem;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: clamp(2rem, 4vw, 3rem);
+            line-height: 0.98;
+            color: #fffdf8;
+        }
+
+        .modal-copy {
+            margin: 0.6rem 0 0;
+            color: var(--muted);
+            line-height: 1.6;
+            max-width: 50ch;
+        }
+
+        .modal-close {
+            border: 1px solid var(--panel-border);
+            background: var(--panel);
+            color: var(--text);
+            border-radius: 999px;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+        }
+
+        .dropzone {
+            position: relative;
+            display: grid;
+            place-items: center;
+            gap: 0.85rem;
+            min-height: 260px;
+            padding: 1.4rem;
+            border: 1px dashed rgba(242, 228, 188, 0.32);
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at top, rgba(242, 228, 188, 0.08), transparent 38%),
+                rgba(255, 255, 255, 0.02);
+            text-align: center;
+            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+            cursor: pointer;
+        }
+
+        .dropzone.is-dragover {
+            border-color: rgba(242, 228, 188, 0.58);
+            background:
+                radial-gradient(circle at top, rgba(242, 228, 188, 0.14), transparent 42%),
+                rgba(255, 255, 255, 0.03);
+        }
+
+        .dropzone-title {
+            font-size: 1.5rem;
+            line-height: 1.1;
+            color: #fffdf8;
+        }
+
+        .dropzone-subtitle {
+            color: var(--muted);
+            line-height: 1.6;
+            max-width: 42ch;
+        }
+
+        .file-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-meta {
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .upload-footer {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .upload-progress {
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            overflow: hidden;
+        }
+
+        .upload-progress-bar {
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(242, 228, 188, 0.72), rgba(247, 196, 95, 0.96));
+            transition: width 0.2s ease;
+        }
+
+        .upload-progress-bar.is-processing {
+            width: 100% !important;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(242, 228, 188, 0.38) 0%,
+                    rgba(247, 196, 95, 0.98) 45%,
+                    rgba(242, 228, 188, 0.38) 100%
+                );
+            background-size: 220% 100%;
+            animation: upload-processing 1.2s linear infinite;
+        }
+
+        @keyframes upload-processing {
+            from { background-position: 200% 0; }
+            to { background-position: -20% 0; }
+        }
+
+        .upload-status {
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .upload-status.is-error {
+            color: var(--danger);
+        }
+
+        .hidden {
+            display: none !important;
         }
 
         @media (max-width: 720px) {
@@ -236,7 +475,13 @@
             }
 
             .book-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(auto-fill, 180px);
+            }
+
+            .hero-top,
+            .modal-header {
+                align-items: stretch;
+                flex-direction: column;
             }
         }
     </style>
@@ -245,37 +490,342 @@
     <main class="library-shell">
         <div class="library-inner">
             <section class="hero">
-                <div class="eyebrow">Reader3 Library</div>
+                <div class="hero-top">
+                    <div class="eyebrow">Reader3 Library</div>
+                    <button type="button" class="action-btn is-accent" id="open-upload-modal">Add Books</button>
+                </div>
                 <h1>Library</h1>
                 <p class="hero-copy">
-                    Pick up where you left off and open any processed book in the same cinematic reading interface.
+                    Pick up where you left off, or bring in a new EPUB without leaving the app.
                 </p>
             </section>
 
-            {% if not books %}
-                <div class="empty-state">
-                    No processed books found yet. Run <code>reader3.py</code> on an epub first to populate your library.
-                </div>
-            {% endif %}
+            <div id="empty-state" class="empty-state{% if books %} hidden{% endif %}">
+                No processed books found yet. Click <code>Add Books</code> to upload an EPUB and populate your library.
+            </div>
 
-            <section class="book-grid">
+            <section class="book-grid" id="book-grid">
                 {% for book in books %}
                     <article class="book-card">
-                        <div class="book-top">
-                            <div class="book-kicker">Processed Book</div>
-                            <h2 class="book-title">{{ book.title }}</h2>
-                        </div>
-                        <p class="book-meta">
-                            {{ book.author or "Unknown author" }}
-                        </p>
                         <div class="book-actions">
-                            <span class="book-sections">{{ book.chapters }} sections</span>
-                            <a href="/read/{{ book.id }}/0" class="read-link">Open Reader</a>
+                            <form class="delete-form" method="post" action="/books/delete">
+                                <input type="hidden" name="book_id" value="{{ book.id }}">
+                                <button type="submit" class="delete-btn" aria-label="Delete {{ book.title }}" onclick="return confirm('Delete {{ book.title|e }}?')">×</button>
+                            </form>
                         </div>
+                        <a href="/read/{{ book.id }}" class="book-open" aria-label="Open {{ book.title }}">
+                            <div class="book-top">
+                                <div class="book-kicker">Processed Book</div>
+                                <h2 class="book-title">{{ book.title }}</h2>
+                            </div>
+                            <p class="book-meta">{{ book.author or "Unknown author" }}</p>
+                            <span class="book-sections">{{ book.chapters }} sections</span>
+                        </a>
                     </article>
                 {% endfor %}
             </section>
         </div>
     </main>
+
+    <div class="modal-backdrop" id="upload-modal" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title" id="upload-modal-title">Add Books</h2>
+                    <p class="modal-copy">
+                        Drag an EPUB into the dropzone or click to choose a file. The server will process it, extract metadata, and add it to your library.
+                    </p>
+                </div>
+                <button type="button" class="modal-close" id="close-upload-modal" aria-label="Close upload modal">×</button>
+            </div>
+
+            <label class="dropzone" id="dropzone">
+                <input class="file-input" id="file-input" type="file" accept=".epub,application/epub+zip">
+                <div class="dropzone-title">Drag EPUB here</div>
+                <div class="dropzone-subtitle">or click <span class="upload-btn is-accent">Upload files</span> to choose a book</div>
+                <div class="upload-meta">Supported format: EPUB. Max size: 100 MB.</div>
+            </label>
+
+            <div class="upload-footer">
+                <div class="upload-progress" aria-hidden="true">
+                    <div class="upload-progress-bar" id="upload-progress-bar"></div>
+                </div>
+                <div class="upload-status" id="upload-status">Choose an EPUB to add it to your library.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadModal = document.getElementById("upload-modal");
+        const openUploadModalButton = document.getElementById("open-upload-modal");
+        const closeUploadModalButton = document.getElementById("close-upload-modal");
+        const dropzone = document.getElementById("dropzone");
+        const fileInput = document.getElementById("file-input");
+        const progressBar = document.getElementById("upload-progress-bar");
+        const uploadStatus = document.getElementById("upload-status");
+        const bookGrid = document.getElementById("book-grid");
+        const emptyState = document.getElementById("empty-state");
+
+        const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+        let currentUpload = null;
+        let currentJobPoll = null;
+
+        function setModalOpen(isOpen) {
+            uploadModal.classList.toggle("is-open", isOpen);
+            uploadModal.setAttribute("aria-hidden", isOpen ? "false" : "true");
+            if (!isOpen) {
+                stopJobPolling();
+                fileInput.value = "";
+                dropzone.classList.remove("is-dragover");
+            }
+        }
+
+        function setUploadStatus(message, isError = false) {
+            uploadStatus.textContent = message;
+            uploadStatus.classList.toggle("is-error", isError);
+        }
+
+        function resetProgress() {
+            progressBar.classList.remove("is-processing");
+            progressBar.style.width = "0%";
+        }
+
+        function stopJobPolling() {
+            if (currentJobPoll) {
+                window.clearTimeout(currentJobPoll);
+                currentJobPoll = null;
+            }
+        }
+
+        function validateFile(file) {
+            if (!file) {
+                return "Choose an EPUB file first.";
+            }
+
+            const isEpub = file.name.toLowerCase().endsWith(".epub");
+            if (!isEpub) {
+                return "Only EPUB uploads are supported.";
+            }
+
+            if (file.size > MAX_UPLOAD_BYTES) {
+                return "File is too large. Maximum size is 100 MB.";
+            }
+
+            return "";
+        }
+
+        function createBookCard(book) {
+            const card = document.createElement("article");
+            card.className = "book-card";
+            card.innerHTML = `
+                <div class="book-actions">
+                    <form class="delete-form" method="post" action="/books/delete">
+                        <input type="hidden" name="book_id">
+                        <button type="submit" class="delete-btn" aria-label="Delete book">×</button>
+                    </form>
+                </div>
+                <a class="book-open">
+                    <div class="book-top">
+                        <div class="book-kicker">Processed Book</div>
+                        <h2 class="book-title"></h2>
+                    </div>
+                    <p class="book-meta"></p>
+                    <span class="book-sections"></span>
+                </a>
+            `;
+            const openLink = card.querySelector(".book-open");
+            openLink.href = "/read/" + encodeURIComponent(book.id);
+            openLink.setAttribute("aria-label", "Open " + book.title);
+            card.querySelector("input[name='book_id']").value = book.id;
+            const deleteButton = card.querySelector(".delete-btn");
+            deleteButton.setAttribute("aria-label", "Delete " + book.title);
+            deleteButton.addEventListener("click", (event) => {
+                if (!window.confirm(`Delete ${book.title}?`)) {
+                    event.preventDefault();
+                }
+            });
+            card.querySelector(".book-title").textContent = book.title;
+            card.querySelector(".book-meta").textContent = book.author || "Unknown author";
+            card.querySelector(".book-sections").textContent = `${book.chapters} sections`;
+            return card;
+        }
+
+        function prependBookCard(book) {
+            emptyState.classList.add("hidden");
+            bookGrid.prepend(createBookCard(book));
+        }
+
+        function pollUploadJob(jobId) {
+            stopJobPolling();
+
+            fetch("/api/books/upload/" + encodeURIComponent(jobId))
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Could not read upload job status.");
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    const job = payload.job;
+                    progressBar.classList.add("is-processing");
+                    progressBar.style.width = "100%";
+                    setUploadStatus(job.message || "Processing book...");
+
+                    if (job.status === "completed") {
+                        progressBar.classList.remove("is-processing");
+                        prependBookCard(job.book);
+                        setUploadStatus(job.message || `Added "${job.book.title}" to your library.`);
+                        window.setTimeout(() => setModalOpen(false), 700);
+                        return;
+                    }
+
+                    if (job.status === "error") {
+                        progressBar.classList.remove("is-processing");
+                        setUploadStatus(job.message || "Upload failed.", true);
+                        return;
+                    }
+
+                    currentJobPoll = window.setTimeout(() => pollUploadJob(jobId), 900);
+                })
+                .catch((error) => {
+                    progressBar.classList.remove("is-processing");
+                    setUploadStatus(error.message || "Could not track upload job.", true);
+                });
+        }
+
+        function uploadFile(file) {
+            const validationError = validateFile(file);
+            if (validationError) {
+                setUploadStatus(validationError, true);
+                resetProgress();
+                return;
+            }
+
+            if (currentUpload) {
+                currentUpload.abort();
+            }
+            stopJobPolling();
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const xhr = new XMLHttpRequest();
+            currentUpload = xhr;
+            setUploadStatus(`Uploading ${file.name}...`);
+            resetProgress();
+
+            xhr.upload.addEventListener("progress", (event) => {
+                if (!event.lengthComputable) {
+                    return;
+                }
+                progressBar.classList.remove("is-processing");
+                const percent = Math.round((event.loaded / event.total) * 100);
+                progressBar.style.width = percent + "%";
+                setUploadStatus(`Uploading ${file.name}... ${percent}%`);
+            });
+
+            xhr.upload.addEventListener("load", () => {
+                progressBar.classList.add("is-processing");
+                progressBar.style.width = "100%";
+                setUploadStatus(`Upload complete. Processing ${file.name}...`);
+            });
+
+            xhr.addEventListener("load", () => {
+                currentUpload = null;
+                if (xhr.status < 200 || xhr.status >= 300) {
+                    progressBar.classList.remove("is-processing");
+                    let message = "Upload failed.";
+                    try {
+                        const payload = JSON.parse(xhr.responseText);
+                        message = payload.detail || message;
+                    } catch (error) {
+                        // Ignore parse errors.
+                    }
+                    setUploadStatus(message, true);
+                    return;
+                }
+
+                try {
+                    const payload = JSON.parse(xhr.responseText);
+                    if (!payload.job_id) {
+                        throw new Error("Upload finished, but no processing job was returned.");
+                    }
+                    pollUploadJob(payload.job_id);
+                } catch (error) {
+                    progressBar.classList.remove("is-processing");
+                    setUploadStatus("Upload finished, but the response could not be read.", true);
+                }
+            });
+
+            xhr.addEventListener("error", () => {
+                currentUpload = null;
+                stopJobPolling();
+                progressBar.classList.remove("is-processing");
+                setUploadStatus("Upload failed. Please try again.", true);
+            });
+
+            xhr.addEventListener("abort", () => {
+                currentUpload = null;
+                stopJobPolling();
+                progressBar.classList.remove("is-processing");
+                setUploadStatus("Upload canceled.", true);
+                resetProgress();
+            });
+
+            xhr.open("POST", "/api/books/upload");
+            xhr.send(formData);
+        }
+
+        openUploadModalButton.addEventListener("click", () => {
+            setUploadStatus("Choose an EPUB to add it to your library.");
+            resetProgress();
+            setModalOpen(true);
+        });
+
+        closeUploadModalButton.addEventListener("click", () => setModalOpen(false));
+
+        uploadModal.addEventListener("click", (event) => {
+            if (event.target === uploadModal) {
+                setModalOpen(false);
+            }
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && uploadModal.classList.contains("is-open")) {
+                setModalOpen(false);
+            }
+        });
+
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files && fileInput.files[0]) {
+                uploadFile(fileInput.files[0]);
+            }
+        });
+
+        dropzone.addEventListener("dragenter", (event) => {
+            event.preventDefault();
+            dropzone.classList.add("is-dragover");
+        });
+
+        dropzone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            dropzone.classList.add("is-dragover");
+        });
+
+        dropzone.addEventListener("dragleave", (event) => {
+            if (!dropzone.contains(event.relatedTarget)) {
+                dropzone.classList.remove("is-dragover");
+            }
+        });
+
+        dropzone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            dropzone.classList.remove("is-dragover");
+            const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+            if (file) {
+                uploadFile(file);
+            }
+        });
+    </script>
 </body>
 </html>

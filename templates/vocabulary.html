@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Words Stats</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --panel: rgba(10, 10, 10, 0.9);
+            --panel-strong: rgba(9, 9, 9, 0.96);
+            --panel-border: rgba(255, 255, 255, 0.09);
+            --text: rgba(250, 248, 244, 0.96);
+            --muted: rgba(220, 214, 204, 0.68);
+            --accent: #f2e4bc;
+            --shadow: 0 28px 80px rgba(0, 0, 0, 0.4);
+            --grid-line: rgba(255, 255, 255, 0.09);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background:
+                radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 34%),
+                radial-gradient(circle at bottom, rgba(255, 255, 255, 0.03), transparent 42%),
+                var(--bg);
+            color: var(--text);
+            font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        }
+
+        body {
+            padding: clamp(1rem, 3vw, 2rem);
+        }
+
+        .shell {
+            position: relative;
+            min-height: calc(100vh - 2rem);
+            border: 1px solid var(--panel-border);
+            border-radius: 32px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 26%),
+                rgba(5, 5, 5, 0.92);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .shell::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 14% 18%, rgba(242, 228, 188, 0.09), transparent 28%),
+                radial-gradient(circle at 84% 10%, rgba(255, 255, 255, 0.05), transparent 26%);
+            pointer-events: none;
+        }
+
+        .inner {
+            position: relative;
+            padding: clamp(1.25rem, 4vw, 3rem);
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0.72rem 1rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 999px;
+            background: var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.04em;
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+            cursor: pointer;
+        }
+
+        .pill:hover,
+        .pill:focus-visible {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(24, 24, 24, 0.94);
+            outline: none;
+        }
+
+        .pill.is-accent {
+            color: var(--accent);
+            border-color: rgba(242, 228, 188, 0.26);
+        }
+
+        .hero {
+            display: grid;
+            gap: 1rem;
+            max-width: 920px;
+            margin-bottom: 1.8rem;
+        }
+
+        .eyebrow,
+        .hero-copy,
+        .stat-label,
+        .chapter-item,
+        .word-cell,
+        .empty {
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            width: fit-content;
+            align-items: center;
+            padding: 0.72rem 1rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 999px;
+            background: var(--panel);
+            color: var(--muted);
+            font-size: 0.82rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        h1,
+        h2,
+        p {
+            margin: 0;
+        }
+
+        .title {
+            font-size: clamp(2.8rem, 5vw, 5.4rem);
+            line-height: 0.96;
+            letter-spacing: -0.04em;
+            color: #fffdf8;
+        }
+
+        .hero-copy {
+            max-width: 62ch;
+            color: var(--muted);
+            line-height: 1.7;
+            font-size: 1rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card,
+        .chapter-panel,
+        .sheet,
+        .empty {
+            position: relative;
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            background: var(--panel-strong);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .stat-card,
+        .chapter-panel,
+        .sheet,
+        .empty {
+            padding: 1.35rem;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 0.84rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            display: block;
+            margin-top: 0.4rem;
+            font-size: clamp(1.8rem, 2vw, 2.5rem);
+            color: #fffdf8;
+        }
+
+        .chapter-panel {
+            margin-bottom: 1.4rem;
+        }
+
+        .chapter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 0.55rem 1rem;
+            margin-top: 1rem;
+        }
+
+        .chapter-item {
+            color: var(--text);
+            line-height: 1.45;
+            font-size: 0.95rem;
+        }
+
+        .sheet {
+            margin-top: 1.25rem;
+            break-after: page;
+        }
+
+        .sheet:last-child {
+            break-after: auto;
+        }
+
+        .sheet-title {
+            margin-bottom: 0.85rem;
+            font-size: 1rem;
+            color: var(--muted);
+        }
+
+        .word-grid-wrap {
+            overflow-x: auto;
+            border-radius: 20px;
+            border: 1px solid var(--grid-line);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .word-grid {
+            width: 100%;
+            min-width: 1100px;
+            border-collapse: collapse;
+            table-layout: fixed;
+            border-top: 1px solid var(--grid-line);
+            border-left: 1px solid var(--grid-line);
+        }
+
+        .word-cell {
+            height: 2.7rem;
+            padding: 0.4rem 0.45rem;
+            border-right: 1px solid var(--grid-line);
+            border-bottom: 1px solid var(--grid-line);
+            color: var(--text);
+            font-size: 0.82rem;
+            line-height: 1.2;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            background: rgba(255, 255, 255, 0.01);
+            vertical-align: middle;
+        }
+
+        .empty {
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 0.8rem;
+            }
+
+            .shell {
+                min-height: calc(100vh - 1.6rem);
+                border-radius: 24px;
+            }
+
+            .inner {
+                padding: 1.1rem;
+            }
+
+            .topbar {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .nav {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="inner">
+            <div class="topbar">
+                <div class="nav">
+                    <a href="/" class="pill">Library</a>
+                    {% if book_id %}
+                        <a href="/read/{{ book_id }}" class="pill">Back To Reader</a>
+                    {% endif %}
+                    <a href="/vocabulary{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill is-accent">Words Stats</a>
+                    <a href="/vocabulary/flashcards{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Flashcards</a>
+                    <a href="/vocabulary/export{% if book_id %}?book_id={{ book_id }}{% endif %}" class="pill">Export CSV</a>
+                </div>
+            </div>
+
+            <section class="hero">
+                <div class="eyebrow">Reader3 Words Stats</div>
+                <h1 class="title">{% if book_title %}{{ book_title }}{% else %}Words Stats{% endif %}</h1>
+                <p class="hero-copy">
+                    Review the total number of saved words, see the count in each chapter, and browse the sheet layout below.
+                </p>
+            </section>
+
+            <section class="stats">
+                <article class="stat-card">
+                    <span class="stat-label">Total Words</span>
+                    <span class="stat-value">{{ total_count }}</span>
+                </article>
+            </section>
+
+            <section class="chapter-panel">
+                <span class="stat-label">Words Per Chapter</span>
+                <div class="chapter-grid">
+                    {% if chapter_counts %}
+                        {% for item in chapter_counts %}
+                            <div class="chapter-item">{{ item.label }}: {{ item.count }}</div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="chapter-item">No words in database.</div>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% if not words %}
+                <div class="empty">No words in database.</div>
+            {% else %}
+                {% for sheet in word_sheets %}
+                    <section class="sheet">
+                        <h2 class="sheet-title">Sheet {{ loop.index }}</h2>
+                        <div class="word-grid-wrap">
+                            <table class="word-grid">
+                                <tbody>
+                                    {% for row in sheet %}
+                                        <tr>
+                                            {% for word in row %}
+                                                <td class="word-cell">{{ word }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>
