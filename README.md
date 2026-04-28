@@ -68,6 +68,3 @@ psql postgresql:///reader3 -c "TRUNCATE TABLE new_words RESTART IDENTITY;"
 cd /Users/charliem/VSCode/github_projects/reader3
 uv sync
 DATABASE_URL="postgresql:///reader3" uv run python server.py
-
-
-- how to add a book
