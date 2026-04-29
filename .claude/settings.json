@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(echo \"Server PID: $!\")",
+      "Bash(curl -s http://localhost:8000 -o /dev/null -w \"%{http_code}\")"
+    ]
+  }
+}
