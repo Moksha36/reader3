@@ -11,7 +11,7 @@ import threading
 import uuid
 from functools import lru_cache
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import psycopg
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -196,6 +196,40 @@ def extract_context_meaning(ai_explanation: str) -> str:
     return ""
 
 
+def extract_pronunciation(ai_explanation: str) -> str:
+    soup = BeautifulSoup(ai_explanation or "", "html.parser")
+
+    for block in soup.select(".meaning-block"):
+        title = block.select_one(".meaning-title")
+        if title and " ".join(title.get_text(" ", strip=True).split()).casefold() == "pronunciation":
+            text = block.select_one(".meaning-text")
+            return " ".join((text or block).get_text(" ", strip=True).split())
+
+    for block in soup.select(".meaning-block"):
+        if block.select_one(".meaning-title"):
+            continue
+
+        text = block.select_one(".meaning-text")
+        pronunciation = " ".join((text or block).get_text(" ", strip=True).split())
+        if pronunciation.startswith("/") and pronunciation.endswith("/"):
+            return pronunciation
+
+    return ""
+
+
+def vocabulary_export_row(word: str, ai_explanation: str) -> list[str]:
+    return [
+        word,
+        "",
+        "",
+        extract_pronunciation(ai_explanation),
+        "",
+        "",
+        "",
+        extract_context_meaning(ai_explanation),
+    ]
+
+
 def csv_response(rows: list[list[str]], filename: str) -> Response:
     output = io.StringIO()
     writer = csv.writer(output)
@@ -246,7 +280,11 @@ def translate_word_with_openai(word: str, sentence: str) -> str:
                     "Do not use <center>. "
                     "Do not wrap everything in one <p>. "
 
-                    "Output exactly two blocks in this structure: "
+                    "Output exactly three blocks in this structure: "
+
+                    '<div class="meaning-block">'
+                    '<div class="meaning-text">/.../</div>'
+                    '</div>'
 
                     '<div class="meaning-block">'
                     '<div class="meaning-title">Context meaning</div>'
@@ -262,13 +300,16 @@ def translate_word_with_openai(word: str, sentence: str) -> str:
                     '</div>'
 
                     "Rules: "
-                    "For the first block, explain the meaning of the word in this specific sentence only. "
+                    "For the first block, provide only the word pronunciation using IPA symbols, wrapped in slash marks. "
+                    "Do not include a title or label for the pronunciation block. "
+                    "If the selected text is a phrase, provide a natural pronunciation for the full phrase. "
+                    "For the second block, explain the meaning of the word in this specific sentence only. "
                     "Keep it short, clear, and concise. "
 
-                    "For the second block, give 1 to 3 general meanings of the word. "
+                    "For the third block, give 1 to 3 general meanings of the word. "
                     "Each meaning must be one <li>. "
 
-                    "Keep both titles exactly as "
+                    "Keep the second and third block titles exactly as "
                     "'Context meaning' and 'General meaning'. "
                     "Output valid HTML fragments only."
                 ),
@@ -764,7 +805,7 @@ def page_html_for_book(page_html: str, book_id: str, first_page_for_href: dict[s
         if not file_href:
             continue
 
-        target_page = first_page_for_href.get(file_href)
+        target_page = first_page_for_href.get(file_href) or first_page_for_href.get(unquote(file_href))
         if target_page:
             rewritten_href = f"/read/{book_path}?page={target_page}"
             if anchor:
@@ -785,8 +826,15 @@ def paginate_book_cached(book_id: str) -> Optional[dict]:
 
     for chapter in book.spine:
         chapter_pages = paginate_chapter(chapter)
-        if chapter.href not in first_page_for_href:
-            first_page_for_href[chapter.href] = len(pages) + 1
+        first_page = len(pages) + 1
+        href_keys = {
+            chapter.href,
+            unquote(chapter.href),
+            quote(unquote(chapter.href), safe="/."),
+        }
+        for href_key in href_keys:
+            if href_key and href_key not in first_page_for_href:
+                first_page_for_href[href_key] = first_page
 
         for page in chapter_pages:
             pages.append(page)
@@ -1325,7 +1373,7 @@ async def export_vocabulary_download(book_id: Optional[str] = None):
             if safe_book_id:
                 cur.execute(
                     """
-                    SELECT word
+                    SELECT word, ai_explanation
                     FROM new_words
                     WHERE book_id = %s
                     ORDER BY chapter_index ASC, created_at ASC, id ASC
@@ -1335,16 +1383,16 @@ async def export_vocabulary_download(book_id: Optional[str] = None):
             else:
                 cur.execute(
                     """
-                    SELECT word
+                    SELECT word, ai_explanation
                     FROM new_words
                     ORDER BY book_id ASC, chapter_index ASC, created_at ASC, id ASC
                     """
                 )
             rows = cur.fetchall()
 
-    csv_rows = [["word"]]
-    for row in rows:
-        csv_rows.append([row[0]])
+    csv_rows = [["word", "", "", "pronunciation", "", "", "", "context meaning"]]
+    for word, ai_explanation in rows:
+        csv_rows.append(vocabulary_export_row(word, ai_explanation))
 
     filename = f"{safe_book_id}_vocabulary_export.csv" if safe_book_id else "reader3_vocabulary_export.csv"
     return csv_response(csv_rows, filename)
@@ -1381,7 +1429,7 @@ async def export_vocabulary_chapter(book_id: str, chapter_index: int):
         [f"Chapter {chapter_display_number(book, chapter_index)}"],
     ]
     for word, ai_explanation in rows:
-        csv_rows.append([word, "", "", extract_context_meaning(ai_explanation)])
+        csv_rows.append(vocabulary_export_row(word, ai_explanation))
 
     filename = f"{safe_book_id}_chapter_{chapter_display_number(book, chapter_index)}_vocabulary_export.csv"
     return csv_response(csv_rows, filename)
@@ -1409,6 +1457,29 @@ async def toggle_vocabulary_word(
         conn.commit()
 
     return RedirectResponse(url=return_to, status_code=303)
+
+
+@app.post("/vocabulary/delete")
+async def delete_vocabulary_word(
+    word_id: int = Form(...),
+    return_to: str = Form("/vocabulary"),
+):
+    if not ensure_new_words_table():
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM new_words
+                WHERE id = %s
+                """,
+                (word_id,),
+            )
+        conn.commit()
+
+    return RedirectResponse(url=return_to, status_code=303)
+
 
 @app.get("/read/{book_id}/images/{image_name}")
 async def serve_image(book_id: str, image_name: str):

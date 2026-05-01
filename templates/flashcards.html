@@ -631,6 +631,12 @@
                                 <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                                 <button type="submit" class="action-btn is-accent">Remembered</button>
                             </form>
+
+                            <form method="post" action="/vocabulary/delete" id="deleteForm">
+                                <input type="hidden" name="word_id" id="deleteWordId" value="{{ flashcards[0].id }}">
+                                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                <button type="submit" class="action-btn is-danger">Delete</button>
+                            </form>
                         </div>
 
                         <div class="shortcut-row">
@@ -658,8 +664,10 @@
             const flipCardButton = document.getElementById("flipCard");
             const againWordId = document.getElementById("againWordId");
             const memorizedWordId = document.getElementById("memorizedWordId");
+            const deleteWordId = document.getElementById("deleteWordId");
             const againForm = document.getElementById("againForm");
             const memorizedForm = document.getElementById("memorizedForm");
+            const deleteForm = document.getElementById("deleteForm");
 
             let currentIndex = 0;
 
@@ -705,6 +713,7 @@
                 const wordId = card.dataset.wordId;
                 againWordId.value = wordId;
                 memorizedWordId.value = wordId;
+                deleteWordId.value = wordId;
             }
 
             cards.forEach((card) => {
@@ -729,6 +738,13 @@
 
             flipCardButton.addEventListener("click", () => {
                 flipCurrentCard();
+            });
+
+            deleteForm.addEventListener("submit", (event) => {
+                const word = currentCard().querySelector(".word").textContent.trim();
+                if (!window.confirm(`Delete "${word}" from your vocabulary?`)) {
+                    event.preventDefault();
+                }
             });
 
             document.addEventListener("keydown", (event) => {
