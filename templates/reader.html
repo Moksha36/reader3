@@ -29,18 +29,18 @@
         }
 
         body {
-            overflow: hidden;
+            overflow: auto;
         }
 
         .reader-shell {
             position: relative;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            overflow: visible;
             padding: clamp(1rem, 2vw, 1.5rem);
         }
 
         .top-bar {
-            position: absolute;
+            position: fixed;
             top: clamp(1rem, 2vw, 1.5rem);
             left: clamp(1rem, 2vw, 1.5rem);
             right: clamp(1rem, 2vw, 1.5rem);
@@ -92,7 +92,7 @@
         }
 
         #sidebar {
-            position: absolute;
+            position: fixed;
             top: clamp(4.5rem, 7vw, 6rem);
             left: clamp(1rem, 2vw, 1.5rem);
             bottom: clamp(1rem, 2vw, 1.5rem);
@@ -170,7 +170,7 @@
         }
 
         .scrim {
-            position: absolute;
+            position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.45);
             opacity: 0;
@@ -186,30 +186,30 @@
 
         .page-stage {
             position: relative;
-            height: 100%;
+            min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             padding: clamp(3rem, 5vw, 4rem) clamp(0.5rem, 2vw, 1.5rem) clamp(2rem, 4vw, 3rem);
         }
 
         .page-card {
             width: min(100%, 980px);
-            height: min(100%, 1200px);
+            min-height: min(100vh, 1200px);
             border-radius: 30px;
             background: transparent;
             box-shadow: none;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .book-content {
-            height: 100%;
+            min-height: 100%;
             padding: clamp(1.5rem, 3vw, 3rem);
             color: var(--text);
             font-size: 1.55rem;
             line-height: 1.3;
             text-wrap: pretty;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .book-content h1,
@@ -306,7 +306,7 @@
         }
 
         .status-bar {
-            position: absolute;
+            position: fixed;
             left: 50%;
             bottom: clamp(1rem, 2vw, 1.5rem);
             transform: translateX(-50%);
@@ -431,7 +431,7 @@
 
             .page-card {
                 border-radius: 22px;
-                height: min(100%, 760px);
+                min-height: auto;
             }
 
             .book-content {
@@ -526,7 +526,7 @@
         </main>
 
         <div class="status-bar">
-            <span id="page-indicator">{{ current_page }} / {{ total_pages }}</span>
+            <span id="page-indicator">Chapter {{ current_page }} / {{ total_pages }}</span>
         </div>
 
         <div class="reader-toast" id="reader-toast" role="status" aria-live="polite"></div>
@@ -552,6 +552,7 @@
         const bookId = "{{ book_id }}";
         const currentPage = {{ current_page }};
         const currentChapterIndex = {{ current_chapter_index }};
+        const currentVocabularyPage = 1;
         const progressStorageKey = "reader3-progress:" + bookId;
         const savedWords = new Set();
         const savedWordMeanings = new Map();
@@ -694,7 +695,7 @@
         }
 
         function rememberSavedWordEntry(entry, chapterIndex = currentChapterIndex) {
-            const pageNumber = entry.page_number ?? currentPage;
+            const pageNumber = entry.page_number ?? currentVocabularyPage;
             const key = savedWordKey(chapterIndex, pageNumber, entry.word);
             savedWords.add(key);
 
@@ -708,13 +709,13 @@
 
         function refreshHighlightedWordMetadata(scope = bookContent) {
             scope.querySelectorAll(".saved-word").forEach((mark) => {
-                const key = savedWordKey(currentChapterIndex, currentPage, mark.dataset.word || mark.textContent);
+                const key = mark.dataset.key || savedWordKey(currentChapterIndex, currentVocabularyPage, mark.dataset.word || mark.textContent);
                 mark.dataset.key = key;
                 mark.dataset.hasMeaning = savedWordMeanings.has(key) ? "true" : "false";
             });
         }
 
-        function highlightWord(word, scope = bookContent, chapterIndex = currentChapterIndex, pageNumber = currentPage) {
+        function highlightWord(word, scope = bookContent, chapterIndex = currentChapterIndex, pageNumber = currentVocabularyPage) {
             const normalized = normalizeWord(word);
             const pattern = buildWordPattern(word);
             const textNodes = textNodesForHighlighting(scope);
@@ -799,7 +800,7 @@
         }
 
         async function refreshSavedWordMeanings() {
-            const fetchKey = currentChapterIndex + ":" + currentPage;
+            const fetchKey = String(currentChapterIndex);
             if (explanationFetches.has(fetchKey)) {
                 return explanationFetches.get(fetchKey);
             }
@@ -809,8 +810,6 @@
                 + encodeURIComponent(bookId)
                 + "/"
                 + currentChapterIndex
-                + "?page_number="
-                + encodeURIComponent(currentPage)
             )
                 .then((response) => {
                     if (!response.ok) {
@@ -838,7 +837,7 @@
         }
 
         async function handleSavedWordPointerEnter(target) {
-            const key = target.dataset.key || savedWordKey(currentChapterIndex, currentPage, target.dataset.word || target.textContent);
+            const key = target.dataset.key || savedWordKey(currentChapterIndex, currentVocabularyPage, target.dataset.word || target.textContent);
             showMeaningTooltip(target, savedWordMeanings.get(key));
 
             if (savedWordMeanings.has(key)) {
@@ -925,7 +924,7 @@
                 words: finalWords,
                 sentence,
                 chapterIndex: parseInt(section.dataset.chapterIndex, 10),
-                pageNumber: currentPage,
+                pageNumber: currentVocabularyPage,
                 section,
                 isPhrase,
             };
@@ -938,8 +937,6 @@
                     + encodeURIComponent(bookId)
                     + "/"
                     + currentChapterIndex
-                    + "?page_number="
-                    + encodeURIComponent(currentPage)
                 );
                 if (!response.ok) {
                     console.warn("Saved words could not be loaded.", response.status);
@@ -949,7 +946,7 @@
                 const payload = await response.json();
                 for (const entry of payload.words) {
                     rememberSavedWordEntry(entry, currentChapterIndex);
-                    highlightWord(entry.word, bookContent, currentChapterIndex, currentPage);
+                    highlightWord(entry.word, bookContent, currentChapterIndex, entry.page_number ?? currentVocabularyPage);
                 }
             } catch (error) {
                 console.warn("Saved words could not be loaded.", error);

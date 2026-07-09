@@ -731,58 +731,18 @@ def top_level_blocks(html: str) -> list[tuple[str, int]]:
 
 
 def paginate_chapter(chapter: ChapterContent) -> list[dict]:
-    blocks = top_level_blocks(chapter.content)
-    if not blocks:
-        return [{
-            "chapter_index": chapter.order,
-            "chapter_href": chapter.href,
-            "html": f'<section class="book-section" data-chapter-index="{chapter.order}" data-chapter-href="{chapter.href}"></section>',
-        }]
-
-    pages: list[dict] = []
-    current_blocks: list[str] = []
-    current_text = 0
-
-    for block_html, text_len in blocks:
-        would_overflow = (
-            current_blocks and (
-                current_text + text_len > PAGE_TEXT_TARGET or
-                len(current_blocks) >= PAGE_BLOCK_LIMIT
-            )
-        )
-
-        if would_overflow:
-            pages.append({
-                "chapter_index": chapter.order,
-                "chapter_href": chapter.href,
-                "html": (
-                    f'<section class="book-section" '
-                    f'data-chapter-index="{chapter.order}" '
-                    f'data-chapter-href="{chapter.href}">'
-                    + "".join(current_blocks) +
-                    "</section>"
-                ),
-            })
-            current_blocks = []
-            current_text = 0
-
-        current_blocks.append(block_html)
-        current_text += text_len
-
-    if current_blocks:
-        pages.append({
-            "chapter_index": chapter.order,
-            "chapter_href": chapter.href,
-            "html": (
-                f'<section class="book-section" '
-                f'data-chapter-index="{chapter.order}" '
-                f'data-chapter-href="{chapter.href}">'
-                + "".join(current_blocks) +
-                "</section>"
-            ),
-        })
-
-    return pages
+    escaped_href = html.escape(chapter.href, quote=True)
+    return [{
+        "chapter_index": chapter.order,
+        "chapter_href": chapter.href,
+        "html": (
+            f'<section class="book-section" '
+            f'data-chapter-index="{chapter.order}" '
+            f'data-chapter-href="{escaped_href}">'
+            + chapter.content +
+            "</section>"
+        ),
+    }]
 
 
 def page_html_for_book(page_html: str, book_id: str, first_page_for_href: dict[str, int]) -> str:
