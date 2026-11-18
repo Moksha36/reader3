@@ -212,11 +212,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            gap: 1.25rem;
             min-height: 0;
         }
 
         .flashcard {
             position: relative;
+            flex: 0 1 760px;
             width: min(100%, 760px);
             min-height: 520px;
             border: 1px solid var(--panel-border);
@@ -224,6 +226,80 @@
             background: transparent;
             cursor: pointer;
             perspective: 1600px;
+        }
+
+        .note-panel {
+            flex: 0 0 320px;
+            width: 320px;
+            min-height: 520px;
+            align-self: stretch;
+            display: flex;
+            flex-direction: column;
+            padding: 1.25rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 26px;
+            background:
+                linear-gradient(180deg, rgba(242, 228, 188, 0.06), transparent 28%),
+                rgba(10, 10, 10, 0.96);
+            box-shadow: var(--shadow);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .note-panel-header {
+            margin-bottom: 1rem;
+        }
+
+        .note-panel-title {
+            margin: 0;
+            color: #fffdf8;
+            font-size: 1.15rem;
+            line-height: 1.25;
+        }
+
+        .note-panel-word {
+            margin: 0.35rem 0 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+
+        .note-textarea {
+            flex: 1;
+            width: 100%;
+            min-height: 340px;
+            resize: none;
+            padding: 0.95rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.035);
+            color: var(--text);
+            font-size: 0.95rem;
+            line-height: 1.55;
+            transition: border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .note-textarea:focus {
+            border-color: rgba(242, 228, 188, 0.34);
+            background: rgba(255, 255, 255, 0.055);
+        }
+
+        .note-panel-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-top: 0.9rem;
+        }
+
+        .note-status {
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
+        .note-status.is-error {
+            color: var(--danger);
         }
 
         .flashcard[hidden],
@@ -473,6 +549,22 @@
             line-height: 1.7;
         }
 
+        @media (max-width: 1120px) {
+            .reviewer {
+                flex-direction: column;
+            }
+
+            .note-panel {
+                flex-basis: auto;
+                width: min(100%, 760px);
+                min-height: 300px;
+            }
+
+            .note-textarea {
+                min-height: 180px;
+            }
+        }
+
         @media (max-width: 720px) {
             body {
                 padding: 0.8rem;
@@ -569,7 +661,7 @@
                                 <div class="flashcard-inner">
                                     <article class="card-face card-front">
                                         <div class="card-front-top">
-                                            <div class="card-meta">{{ entry.book_title }} · Chapter {{ entry.chapter_number }}</div>
+                                            <div class="card-meta">{{ entry.book_title }} · {{ entry.location_label }}</div>
                                             <h2 class="word">{{ entry.word }}</h2>
                                         </div>
                                         <div class="card-front-bottom">
@@ -599,6 +691,24 @@
                                 </div>
                             </button>
                         {% endfor %}
+
+                        <aside class="note-panel" aria-labelledby="notePanelTitle">
+                            <div class="note-panel-header">
+                                <h2 class="note-panel-title" id="notePanelTitle">Notes &amp; thoughts</h2>
+                                <p class="note-panel-word" id="notePanelWord"></p>
+                            </div>
+                            <textarea
+                                class="note-textarea"
+                                id="noteTextarea"
+                                maxlength="20000"
+                                placeholder="Write notes, connections, examples, or anything you want to remember…"
+                                aria-label="Notes for the active flashcard"
+                            ></textarea>
+                            <div class="note-panel-footer">
+                                <span class="note-status" id="noteStatus" role="status" aria-live="polite">Saved</span>
+                                <button type="button" class="action-btn is-accent" id="saveNote">Save note</button>
+                            </div>
+                        </aside>
                     </div>
 
                     <div class="study-dock">
@@ -668,14 +778,23 @@
             const againForm = document.getElementById("againForm");
             const memorizedForm = document.getElementById("memorizedForm");
             const deleteForm = document.getElementById("deleteForm");
+            const noteTextarea = document.getElementById("noteTextarea");
+            const notePanelWord = document.getElementById("notePanelWord");
+            const noteStatus = document.getElementById("noteStatus");
+            const saveNoteButton = document.getElementById("saveNote");
+            const notesById = new Map(Object.entries({{ notes_by_id | tojson }}));
+            const noteSaveChains = new Map();
+            const dirtyNoteIds = new Set();
 
             let currentIndex = 0;
+            let noteSaveTimer = null;
 
             function currentCard() {
                 return cards[currentIndex];
             }
 
             function setActiveCard(nextIndex) {
+                flushActiveNote();
                 cards[currentIndex].hidden = true;
                 cards[currentIndex].classList.remove("is-active");
 
@@ -706,6 +825,7 @@
                 prevCardButton.disabled = currentIndex === 0;
                 nextCardButton.disabled = currentIndex === cards.length - 1;
                 syncWordIds();
+                syncNotePanel();
             }
 
             function syncWordIds() {
@@ -714,6 +834,79 @@
                 againWordId.value = wordId;
                 memorizedWordId.value = wordId;
                 deleteWordId.value = wordId;
+            }
+
+            function setNoteStatus(message, isError = false) {
+                noteStatus.textContent = message;
+                noteStatus.classList.toggle("is-error", isError);
+            }
+
+            function syncNotePanel() {
+                const card = currentCard();
+                const wordId = card.dataset.wordId;
+                const word = card.querySelector(".word").textContent.trim();
+                notePanelWord.textContent = `For “${word}”`;
+                noteTextarea.value = notesById.get(wordId) || "";
+                setNoteStatus("Saved");
+            }
+
+            function saveNote(wordId, note) {
+                notesById.set(wordId, note);
+                const previousSave = noteSaveChains.get(wordId) || Promise.resolve();
+                const nextSave = previousSave
+                    .catch(() => null)
+                    .then(() => fetch(`/api/vocabulary/${encodeURIComponent(wordId)}/note`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ note }),
+                        keepalive: true,
+                    }))
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error("Note could not be saved.");
+                        }
+                        if (notesById.get(wordId) === note) {
+                            dirtyNoteIds.delete(wordId);
+                        }
+                        if (currentCard().dataset.wordId === wordId && noteTextarea.value === note) {
+                            setNoteStatus("Saved");
+                        }
+                    })
+                    .catch((error) => {
+                        if (currentCard().dataset.wordId === wordId) {
+                            setNoteStatus(error.message || "Note could not be saved.", true);
+                        }
+                    });
+                noteSaveChains.set(wordId, nextSave);
+                return nextSave;
+            }
+
+            function flushActiveNote() {
+                if (noteSaveTimer) {
+                    window.clearTimeout(noteSaveTimer);
+                    noteSaveTimer = null;
+                }
+                const wordId = currentCard().dataset.wordId;
+                const note = noteTextarea.value;
+                if (dirtyNoteIds.has(wordId)) {
+                    saveNote(wordId, note);
+                }
+            }
+
+            function scheduleNoteSave() {
+                const wordId = currentCard().dataset.wordId;
+                const note = noteTextarea.value;
+                notesById.set(wordId, note);
+                dirtyNoteIds.add(wordId);
+                setNoteStatus("Unsaved changes");
+                if (noteSaveTimer) {
+                    window.clearTimeout(noteSaveTimer);
+                }
+                noteSaveTimer = window.setTimeout(() => {
+                    noteSaveTimer = null;
+                    setNoteStatus("Saving…");
+                    saveNote(wordId, note);
+                }, 700);
             }
 
             cards.forEach((card) => {
@@ -739,6 +932,18 @@
             flipCardButton.addEventListener("click", () => {
                 flipCurrentCard();
             });
+
+            noteTextarea.addEventListener("input", scheduleNoteSave);
+            saveNoteButton.addEventListener("click", () => {
+                if (noteSaveTimer) {
+                    window.clearTimeout(noteSaveTimer);
+                    noteSaveTimer = null;
+                }
+                setNoteStatus("Saving…");
+                saveNote(currentCard().dataset.wordId, noteTextarea.value);
+            });
+
+            window.addEventListener("pagehide", flushActiveNote);
 
             deleteForm.addEventListener("submit", (event) => {
                 const word = currentCard().querySelector(".word").textContent.trim();

@@ -16,3 +16,5 @@ wheels/
 # Custom
 *_data/
 *.epub
+*.pdf
+node_modules/

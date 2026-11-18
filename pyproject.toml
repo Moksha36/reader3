@@ -1,7 +1,7 @@
 [project]
 name = "reader3"
 version = "0.1.0"
-description = "Simple EPUB reader web app"
+description = "Self-hosted EPUB and PDF reader with vocabulary tools"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -10,6 +10,7 @@ dependencies = [
     "fastapi>=0.121.2",
     "jinja2>=3.1.6",
     "openai>=2.6.1",
+    "pymupdf>=1.26.0",
     "python-dotenv>=1.1.1",
     "python-multipart>=0.0.20",
     "psycopg[binary]>=3.2.9",

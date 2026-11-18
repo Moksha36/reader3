@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Request, HTTPException, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -31,11 +32,13 @@ except ModuleNotFoundError:
         pass
 
 from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, process_epub, save_to_pickle
+from pdf_processor import process_pdf
 
 load_dotenv()
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static", check_dir=False), name="static")
 
 # Where are the processed book folders located?
 BOOKS_DIRS = [".", "books"]
@@ -103,10 +106,15 @@ class NewWordCreate(BaseModel):
     sentence: str
     word: str
     ai_explanation: str = ""
+    selection_anchor: Optional[dict] = None
 
 
 class VocabularyToggle(BaseModel):
     memorized: bool
+
+
+class VocabularyNoteUpdate(BaseModel):
+    note: str
 
 
 PAGE_TEXT_TARGET = 1000
@@ -251,6 +259,8 @@ def flattened_toc_entries(entries: list[TOCEntry]) -> list[TOCEntry]:
 
 
 def chapter_display_number(book: Book, chapter_index: int) -> int:
+    if book_format(book) == "pdf":
+        return chapter_index + 1
     if 0 <= chapter_index < len(book.spine):
         chapter_href = book.spine[chapter_index].href
         for entry in flattened_toc_entries(book.toc):
@@ -262,6 +272,18 @@ def chapter_display_number(book: Book, chapter_index: int) -> int:
                 return int(match.group(1))
 
     return chapter_index + 1
+
+
+def book_format(book: Book) -> str:
+    return getattr(book, "format", "epub") or "epub"
+
+
+def location_label(book: Optional[Book], chapter_index: int) -> str:
+    if book and book_format(book) == "pdf":
+        return f"Page {chapter_index + 1}"
+    if book:
+        return f"Chapter {chapter_display_number(book, chapter_index)}"
+    return f"Chapter {chapter_index + 1}"
 
 
 def translate_word_with_openai(word: str, sentence: str) -> str:
@@ -391,6 +413,10 @@ def ensure_new_words_table() -> bool:
                         memorized BOOLEAN NOT NULL DEFAULT FALSE,
                         word TEXT NOT NULL,
                         normalized_word TEXT NOT NULL,
+                        document_format TEXT NOT NULL DEFAULT 'epub',
+                        location_label TEXT NOT NULL DEFAULT '',
+                        selection_anchor JSONB,
+                        note TEXT NOT NULL DEFAULT '',
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         UNIQUE (book_id, chapter_index, page_number, normalized_word)
                     )
@@ -424,6 +450,30 @@ def ensure_new_words_table() -> bool:
                     """
                     ALTER TABLE new_words
                     ADD COLUMN IF NOT EXISTS memorized BOOLEAN NOT NULL DEFAULT FALSE
+                    """
+                )
+                cur.execute(
+                    """
+                    ALTER TABLE new_words
+                    ADD COLUMN IF NOT EXISTS document_format TEXT NOT NULL DEFAULT 'epub'
+                    """
+                )
+                cur.execute(
+                    """
+                    ALTER TABLE new_words
+                    ADD COLUMN IF NOT EXISTS location_label TEXT NOT NULL DEFAULT ''
+                    """
+                )
+                cur.execute(
+                    """
+                    ALTER TABLE new_words
+                    ADD COLUMN IF NOT EXISTS selection_anchor JSONB
+                    """
+                )
+                cur.execute(
+                    """
+                    ALTER TABLE new_words
+                    ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''
                     """
                 )
                 cur.execute(
@@ -527,8 +577,8 @@ def stage_uploaded_book(upload: UploadFile) -> tuple[str, str]:
         raise HTTPException(status_code=400, detail="Please choose a file to upload.")
 
     extension = os.path.splitext(filename)[1].lower()
-    if extension != ".epub":
-        raise HTTPException(status_code=400, detail="Only EPUB uploads are supported.")
+    if extension not in {".epub", ".pdf"}:
+        raise HTTPException(status_code=400, detail="Only EPUB and PDF uploads are supported.")
 
     total_size = 0
     temp_dir = tempfile.mkdtemp(prefix="reader3_upload_")
@@ -547,6 +597,12 @@ def stage_uploaded_book(upload: UploadFile) -> tuple[str, str]:
                         detail=f"File is too large. Maximum size is {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)} MB.",
                     )
                 temp_file.write(chunk)
+        with open(temp_book_path, "rb") as staged_file:
+            signature = staged_file.read(8)
+        if extension == ".pdf" and not signature.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="The uploaded file is not a valid PDF.")
+        if extension == ".epub" and not signature.startswith(b"PK"):
+            raise HTTPException(status_code=400, detail="The uploaded file is not a valid EPUB.")
         return temp_dir, temp_book_path
     except HTTPException:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -564,9 +620,16 @@ def process_uploaded_book_job(job_id: str, temp_dir: str, temp_book_path: str) -
         set_upload_job(job_id, status="processing", message=f"Processing {filename}...")
         base_slug = slugify_book_name(os.path.splitext(filename)[0])
         _, output_dir = unique_book_output_dir(base_slug)
-        book_obj = process_epub(temp_book_path, output_dir)
+        extension = os.path.splitext(filename)[1].lower()
+        book_obj = (
+            process_pdf(temp_book_path, output_dir)
+            if extension == ".pdf"
+            else process_epub(temp_book_path, output_dir)
+        )
         save_to_pickle(book_obj, output_dir)
-        shutil.copy2(temp_book_path, os.path.join(output_dir, filename))
+        stored_source = os.path.join(output_dir, filename)
+        if not os.path.exists(stored_source):
+            shutil.copy2(temp_book_path, stored_source)
         clear_book_caches()
 
         set_upload_job(
@@ -578,6 +641,8 @@ def process_uploaded_book_job(job_id: str, temp_dir: str, temp_book_path: str) -
                 "title": book_obj.metadata.title,
                 "author": ", ".join(book_obj.metadata.authors) or "Unknown author",
                 "chapters": len(book_obj.spine),
+                "format": book_format(book_obj),
+                "ocr_pages": getattr(book_obj, "ocr_page_count", 0),
             },
         )
     except Exception as exc:
@@ -617,6 +682,7 @@ def list_books_index() -> dict[str, dict[str, str]]:
                 books[item] = {
                     "title": book.metadata.title,
                     "author": ", ".join(book.metadata.authors) or "Unknown author",
+                    "format": book_format(book),
                 }
 
     return books
@@ -841,7 +907,8 @@ async def library_view(request: Request):
             "id": book_id,
             "title": info["title"],
             "author": info["author"],
-            "chapters": len(book.spine)
+            "chapters": len(book.spine),
+            "format": book_format(book),
         })
 
     return templates.TemplateResponse("library.html", {"request": request, "books": books})
@@ -917,7 +984,7 @@ async def read_book(request: Request, book_id: str):
     prev_page = current_page - 1 if current_page > 1 else None
     next_page = current_page + 1 if current_page < len(paginated["pages"]) else None
 
-    return templates.TemplateResponse("reader.html", {
+    response = templates.TemplateResponse("reader.html", {
         "request": request,
         "book": book,
         "book_id": safe_book_id,
@@ -932,7 +999,30 @@ async def read_book(request: Request, book_id: str):
         "prev_page": prev_page,
         "next_page": next_page,
         "toc_page_map": paginated["first_page_for_href"],
+        "book_format": book_format(book),
     })
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/read/{book_id}/source.pdf")
+async def serve_pdf_source(book_id: str):
+    safe_book_id = os.path.basename(book_id)
+    book = load_book_cached(safe_book_id)
+    book_dir = find_book_dir(safe_book_id)
+    if not book or not book_dir or book_format(book) != "pdf":
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    source_path = os.path.join(book_dir, os.path.basename(book.source_file))
+    if not os.path.isfile(source_path):
+        raise HTTPException(status_code=404, detail="PDF source file not found")
+    return FileResponse(
+        source_path,
+        media_type="application/pdf",
+        filename=os.path.basename(book.source_file),
+        content_disposition_type="inline",
+    )
 
 @app.get("/read/{book_id}/{chapter_index}", response_class=HTMLResponse)
 async def redirect_legacy_chapter_route(request: Request, book_id: str, chapter_index: int):
@@ -963,7 +1053,7 @@ async def list_new_words(book_id: str, chapter_index: int, page_number: Optional
             if page_number is not None:
                 cur.execute(
                     """
-                    SELECT word, page_number, times, sentence, ai_explanation, memorized
+                    SELECT word, page_number, times, sentence, ai_explanation, memorized, selection_anchor
                     FROM new_words
                     WHERE book_id = %s AND chapter_index = %s AND page_number = %s
                     ORDER BY created_at ASC, id ASC
@@ -973,7 +1063,7 @@ async def list_new_words(book_id: str, chapter_index: int, page_number: Optional
             else:
                 cur.execute(
                     """
-                    SELECT word, page_number, times, sentence, ai_explanation, memorized
+                    SELECT word, page_number, times, sentence, ai_explanation, memorized, selection_anchor
                     FROM new_words
                     WHERE book_id = %s AND chapter_index = %s
                     ORDER BY created_at ASC, id ASC
@@ -993,6 +1083,7 @@ async def list_new_words(book_id: str, chapter_index: int, page_number: Optional
                 "sentence": row[3],
                 "ai_explanation": row[4],
                 "memorized": row[5],
+                "selection_anchor": row[6],
             }
             for row in rows
         ],
@@ -1010,7 +1101,7 @@ async def list_new_words_for_book(book_id: str):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chapter_index, word, page_number, times, sentence, ai_explanation, memorized
+                SELECT chapter_index, word, page_number, times, sentence, ai_explanation, memorized, selection_anchor
                 FROM new_words
                 WHERE book_id = %s
                 ORDER BY chapter_index ASC, created_at ASC, id ASC
@@ -1030,6 +1121,7 @@ async def list_new_words_for_book(book_id: str):
                 "sentence": row[4],
                 "ai_explanation": row[5],
                 "memorized": row[6],
+                "selection_anchor": row[7],
             }
             for row in rows
         ],
@@ -1067,13 +1159,20 @@ async def create_new_word(payload: NewWordCreate, background_tasks: BackgroundTa
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO new_words (book_id, chapter_index, page_number, times, sentence, ai_explanation, word, normalized_word)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO new_words (
+                    book_id, chapter_index, page_number, times, sentence,
+                    ai_explanation, word, normalized_word, document_format,
+                    location_label, selection_anchor
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                 ON CONFLICT (book_id, chapter_index, page_number, normalized_word)
                 DO UPDATE SET
                     word = EXCLUDED.word,
                     page_number = EXCLUDED.page_number,
                     sentence = EXCLUDED.sentence,
+                    document_format = EXCLUDED.document_format,
+                    location_label = EXCLUDED.location_label,
+                    selection_anchor = COALESCE(EXCLUDED.selection_anchor, new_words.selection_anchor),
                     ai_explanation = CASE
                         WHEN EXCLUDED.ai_explanation <> '' THEN EXCLUDED.ai_explanation
                         ELSE new_words.ai_explanation
@@ -1089,6 +1188,9 @@ async def create_new_word(payload: NewWordCreate, background_tasks: BackgroundTa
                     ai_explanation,
                     payload.word.strip(),
                     normalized_word,
+                    book_format(book),
+                    location_label(book, payload.chapter_index),
+                    json.dumps(payload.selection_anchor) if payload.selection_anchor else None,
                 ),
             )
             row = cur.fetchone()
@@ -1115,6 +1217,7 @@ async def create_new_word(payload: NewWordCreate, background_tasks: BackgroundTa
         "sentence": row[4],
         "ai_explanation": row[5],
         "ai_explanation_pending": should_generate_ai_explanation and not row[5],
+        "selection_anchor": payload.selection_anchor,
         "memorized": row[6],
         "created_at": row[7].isoformat(),
     }
@@ -1168,8 +1271,9 @@ async def vocabulary_view(request: Request, book_id: Optional[str] = None):
             item[0][1],
         ),
     ):
+        row_book = load_book_cached(row_book_id)
         chapter_counts.append({
-            "label": f"{books_index.get(row_book_id, {}).get('title', row_book_id)} - Chapter {chapter_index}",
+            "label": f"{books_index.get(row_book_id, {}).get('title', row_book_id)} - {location_label(row_book, chapter_index)}",
             "count": count,
         })
 
@@ -1216,7 +1320,7 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
             if safe_book_id:
                 cur.execute(
                     """
-                    SELECT id, book_id, chapter_index, page_number, word, sentence, ai_explanation, memorized, created_at
+                    SELECT id, book_id, chapter_index, page_number, word, sentence, ai_explanation, memorized, note, created_at
                     FROM new_words
                     WHERE book_id = %s
                     ORDER BY memorized ASC, created_at DESC, id DESC
@@ -1226,7 +1330,7 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
             else:
                 cur.execute(
                     """
-                    SELECT id, book_id, chapter_index, page_number, word, sentence, ai_explanation, memorized, created_at
+                    SELECT id, book_id, chapter_index, page_number, word, sentence, ai_explanation, memorized, note, created_at
                     FROM new_words
                     ORDER BY memorized ASC, created_at DESC, id DESC
                     """
@@ -1242,15 +1346,19 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
             "book_id": row[1],
             "chapter_index": row[2],
             "chapter_number": chapter_display_number(row_book, row[2]) if row_book else row[2] + 1,
+            "location_label": location_label(row_book, row[2]),
             "page_number": row[3],
             "word": row[4],
             "sentence": row[5],
             "highlighted_sentence": highlight_word_in_sentence(row[5], row[4]),
             "ai_explanation": row[6],
             "memorized": row[7],
-            "created_at": row[8],
+            "note": row[8],
+            "created_at": row[9],
             "book_title": books_index.get(row[1], {}).get("title", row[1]),
         })
+
+    notes_by_id = {str(entry["id"]): entry["note"] for entry in flashcards}
 
     return templates.TemplateResponse("flashcards.html", {
         "request": request,
@@ -1259,7 +1367,36 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
         "book_title": books_index.get(safe_book_id, {}).get("title") if safe_book_id else None,
         "memorized_count": sum(1 for row in flashcards if row["memorized"]),
         "total_count": len(flashcards),
+        "notes_by_id": notes_by_id,
     })
+
+
+@app.post("/api/vocabulary/{word_id}/note")
+async def update_vocabulary_note(word_id: int, payload: VocabularyNoteUpdate):
+    if not ensure_new_words_table():
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable")
+
+    note = payload.note.replace("\r\n", "\n").replace("\r", "\n")
+    if len(note) > 20_000:
+        raise HTTPException(status_code=400, detail="Note is too long")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE new_words
+                SET note = %s
+                WHERE id = %s
+                RETURNING id
+                """,
+                (note, word_id),
+            )
+            updated = cur.fetchone()
+        conn.commit()
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="Vocabulary entry not found")
+    return {"ok": True, "word_id": word_id, "note": note}
 
 
 @app.get("/vocabulary/export", response_class=HTMLResponse)
@@ -1309,6 +1446,7 @@ async def export_vocabulary_view(request: Request, book_id: Optional[str] = None
             "book_title": books_index.get(row_book_id, {}).get("title", row_book_id),
             "chapter_index": chapter_index,
             "chapter_number": display_number,
+            "location_label": location_label(book, chapter_index),
             "count": count,
         })
 
@@ -1384,14 +1522,16 @@ async def export_vocabulary_chapter(book_id: str, chapter_index: int):
             )
             rows = cur.fetchall()
 
+    display_location = location_label(book, chapter_index)
     csv_rows = [
         [book.metadata.title],
-        [f"Chapter {chapter_display_number(book, chapter_index)}"],
+        [display_location],
     ]
     for word, ai_explanation in rows:
         csv_rows.append(vocabulary_export_row(word, ai_explanation))
 
-    filename = f"{safe_book_id}_chapter_{chapter_display_number(book, chapter_index)}_vocabulary_export.csv"
+    location_slug = display_location.casefold().replace(" ", "_")
+    filename = f"{safe_book_id}_{location_slug}_vocabulary_export.csv"
     return csv_response(csv_rows, filename)
 
 

@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.metadata.title }}</title>
+    {% if book_format == "pdf" %}
+    <link rel="stylesheet" href="/static/vendor/pdfjs/pdf_viewer.css">
+    {% endif %}
     <style>
         :root {
             --bg: #050505;
@@ -267,6 +270,74 @@
             cursor: help;
         }
 
+        .pdf-page-host {
+            --scale-factor: 1;
+            --user-unit: 1;
+            --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+            --scale-round-x: 1px;
+            --scale-round-y: 1px;
+            position: relative;
+            margin: 0 auto;
+            background: #fff;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.48);
+        }
+
+        .pdf-page-host canvas {
+            display: block;
+        }
+
+        .pdf-page-host .textLayer {
+            z-index: 2;
+        }
+
+        .pdf-page-host .textLayer ::selection {
+            background: rgba(42, 140, 255, 0.5);
+        }
+
+        .pdf-highlight-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .pdf-highlight {
+            position: absolute;
+            box-sizing: border-box;
+            padding: 0;
+            border-radius: 2px;
+            border: 1px solid rgba(179, 123, 0, 0.72);
+            background: rgba(255, 213, 0, 0.62);
+            box-shadow: 0 0 0 1px rgba(255, 238, 105, 0.22);
+            pointer-events: none;
+        }
+
+        .pdf-loading {
+            min-width: min(80vw, 720px);
+            min-height: 70vh;
+            display: grid;
+            place-items: center;
+            color: #333;
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 1rem;
+        }
+
+        .pdf-text-warning {
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            z-index: 5;
+            width: min(90%, 620px);
+            padding: 0.8rem 1rem;
+            transform: translateX(-50%);
+            border: 1px solid rgba(120, 74, 18, 0.25);
+            border-radius: 12px;
+            background: rgba(255, 246, 221, 0.96);
+            color: #593a12;
+            font: 600 0.86rem/1.4 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            text-align: center;
+        }
+
         .meaning-tooltip {
             position: fixed;
             z-index: 60;
@@ -497,8 +568,25 @@
 
         <main class="page-stage">
             <div class="page-card" id="page-card">
-                <article class="book-content" id="book-content">
-                    {{ current_page_html | safe }}
+                <article class="book-content{% if book_format == 'pdf' %} pdf-content{% endif %}" id="book-content">
+                    {% if book_format == "pdf" %}
+                        <section
+                            class="book-section pdf-page-host"
+                            id="pdf-page-host"
+                            data-chapter-index="{{ current_chapter_index }}"
+                            data-chapter-href="page-{{ current_page }}"
+                        >
+                            <div class="pdf-loading" id="pdf-loading">Loading PDF page…</div>
+                            <div class="pdf-text-warning" id="pdf-text-warning" hidden>
+                                This page has no selectable text. It can be read visually, but highlighting and translation require an OCR-processed PDF.
+                            </div>
+                            <canvas id="pdf-canvas" aria-label="PDF page {{ current_page }}"></canvas>
+                            <div class="textLayer" id="pdf-text-layer"></div>
+                            <div class="pdf-highlight-layer" id="pdf-highlight-layer"></div>
+                        </section>
+                    {% else %}
+                        {{ current_page_html | safe }}
+                    {% endif %}
                 </article>
             </div>
 
@@ -526,7 +614,7 @@
         </main>
 
         <div class="status-bar">
-            <span id="page-indicator">Chapter {{ current_page }} / {{ total_pages }}</span>
+            <span id="page-indicator">{% if book_format == "pdf" %}Page{% else %}Section{% endif %} {{ current_page }} / {{ total_pages }}</span>
         </div>
 
         <div class="reader-toast" id="reader-toast" role="status" aria-live="polite"></div>
@@ -552,7 +640,8 @@
         const bookId = "{{ book_id }}";
         const currentPage = {{ current_page }};
         const currentChapterIndex = {{ current_chapter_index }};
-        const currentVocabularyPage = 1;
+        const isPdf = {{ (book_format == "pdf") | tojson }};
+        const currentVocabularyPage = isPdf ? currentPage : 1;
         const progressStorageKey = "reader3-progress:" + bookId;
         const savedWords = new Set();
         const savedWordMeanings = new Map();
@@ -671,6 +760,192 @@
 
         function savedWordKey(chapterIndex, pageNumber, word) {
             return chapterIndex + ":" + pageNumber + ":" + normalizeWord(word);
+        }
+
+        function selectionAnchorForRange(range, textScope, quote) {
+            if (!isPdf) {
+                return null;
+            }
+
+            const prefixRange = document.createRange();
+            prefixRange.selectNodeContents(textScope);
+            const endRange = document.createRange();
+            endRange.selectNodeContents(textScope);
+            try {
+                prefixRange.setEnd(range.startContainer, range.startOffset);
+                endRange.setEnd(range.endContainer, range.endOffset);
+            } catch (error) {
+                return null;
+            }
+
+            const rawText = textScope.textContent || "";
+            const startOffset = prefixRange.toString().length;
+            const endOffset = endRange.toString().length;
+            return {
+                page: currentPage,
+                quote: cleanText(quote),
+                start_offset: startOffset,
+                end_offset: endOffset,
+                prefix: cleanText(rawText.slice(Math.max(0, startOffset - 40), startOffset)),
+                suffix: cleanText(rawText.slice(endOffset, endOffset + 40)),
+            };
+        }
+
+        function pdfCaretRangeAtPoint(x, y) {
+            if (document.caretRangeFromPoint) {
+                return document.caretRangeFromPoint(x, y);
+            }
+            if (document.caretPositionFromPoint) {
+                const position = document.caretPositionFromPoint(x, y);
+                if (!position) {
+                    return null;
+                }
+                const range = document.createRange();
+                range.setStart(position.offsetNode, position.offset);
+                range.collapse(true);
+                return range;
+            }
+            return null;
+        }
+
+        function selectPdfWordAtPoint(event) {
+            if (!isPdf) {
+                return;
+            }
+            const textLayer = document.getElementById("pdf-text-layer");
+            const caretRange = pdfCaretRangeAtPoint(event.clientX, event.clientY);
+            if (!textLayer || !caretRange || !textLayer.contains(caretRange.startContainer)) {
+                return;
+            }
+
+            const node = caretRange.startContainer;
+            if (node.nodeType !== Node.TEXT_NODE || !node.nodeValue) {
+                return;
+            }
+            const text = node.nodeValue;
+            const isWordCharacter = (character) => /[\p{L}\p{N}'’\-]/u.test(character || "");
+            let start = Math.min(caretRange.startOffset, Math.max(0, text.length - 1));
+            if (!isWordCharacter(text[start]) && start > 0 && isWordCharacter(text[start - 1])) {
+                start -= 1;
+            }
+            if (!isWordCharacter(text[start])) {
+                return;
+            }
+            let end = start + 1;
+            while (start > 0 && isWordCharacter(text[start - 1])) {
+                start -= 1;
+            }
+            while (end < text.length && isWordCharacter(text[end])) {
+                end += 1;
+            }
+
+            const wordRange = document.createRange();
+            wordRange.setStart(node, start);
+            wordRange.setEnd(node, end);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(wordRange);
+            event.preventDefault();
+        }
+
+        function pdfTextNodes() {
+            const layer = document.getElementById("pdf-text-layer");
+            if (!layer) {
+                return [];
+            }
+            const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    return node.nodeValue ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                }
+            });
+            const nodes = [];
+            let node = walker.nextNode();
+            while (node) {
+                nodes.push(node);
+                node = walker.nextNode();
+            }
+            return nodes;
+        }
+
+        function pdfRangeFromOffsets(startOffset, endOffset) {
+            const nodes = pdfTextNodes();
+            let cursor = 0;
+            let startPoint = null;
+            let endPoint = null;
+
+            for (const node of nodes) {
+                const nextCursor = cursor + node.nodeValue.length;
+                if (!startPoint && startOffset >= cursor && startOffset <= nextCursor) {
+                    startPoint = [node, Math.min(node.nodeValue.length, startOffset - cursor)];
+                }
+                if (!endPoint && endOffset >= cursor && endOffset <= nextCursor) {
+                    endPoint = [node, Math.min(node.nodeValue.length, endOffset - cursor)];
+                }
+                cursor = nextCursor;
+            }
+
+            if (!startPoint || !endPoint) {
+                return null;
+            }
+            const range = document.createRange();
+            range.setStart(startPoint[0], startPoint[1]);
+            range.setEnd(endPoint[0], endPoint[1]);
+            return range;
+        }
+
+        function drawPdfHighlight(range, entry, key) {
+            const host = document.getElementById("pdf-page-host");
+            const layer = document.getElementById("pdf-highlight-layer");
+            if (!host || !layer || !range) {
+                return;
+            }
+            const hostRect = host.getBoundingClientRect();
+            for (const rect of range.getClientRects()) {
+                if (rect.width < 1 || rect.height < 1) {
+                    continue;
+                }
+                const mark = document.createElement("span");
+                mark.className = "saved-word pdf-highlight";
+                mark.dataset.word = normalizeWord(entry.word);
+                mark.dataset.key = key;
+                mark.dataset.hasMeaning = savedWordMeanings.has(key) ? "true" : "false";
+                mark.style.left = (rect.left - hostRect.left) + "px";
+                mark.style.top = (rect.top - hostRect.top) + "px";
+                mark.style.width = rect.width + "px";
+                mark.style.height = rect.height + "px";
+                layer.appendChild(mark);
+            }
+        }
+
+        function highlightPdfEntry(entry, chapterIndex = currentChapterIndex) {
+            const layer = document.getElementById("pdf-text-layer");
+            if (!layer) {
+                return;
+            }
+            const pageNumber = entry.page_number ?? currentVocabularyPage;
+            const key = savedWordKey(chapterIndex, pageNumber, entry.word);
+            const anchor = entry.selection_anchor || null;
+            let startOffset = Number.isInteger(anchor?.start_offset) ? anchor.start_offset : -1;
+            let endOffset = Number.isInteger(anchor?.end_offset) ? anchor.end_offset : -1;
+            const fullText = layer.textContent || "";
+            const anchoredText = startOffset >= 0 && endOffset > startOffset
+                ? normalizeWord(fullText.slice(startOffset, endOffset))
+                : "";
+
+            if (
+                startOffset < 0
+                || endOffset <= startOffset
+                || endOffset > fullText.length
+                || anchoredText !== normalizeWord(entry.word)
+            ) {
+                startOffset = fullText.toLocaleLowerCase().indexOf(entry.word.toLocaleLowerCase());
+                endOffset = startOffset < 0 ? -1 : startOffset + entry.word.length;
+            }
+
+            if (startOffset >= 0 && endOffset > startOffset) {
+                drawPdfHighlight(pdfRangeFromOffsets(startOffset, endOffset), entry, key);
+                savedWords.add(key);
+            }
         }
 
         function extractContextMeaning(aiExplanation) {
@@ -910,7 +1185,10 @@
                 return null;
             }
 
-            const sectionText = cleanText(section.textContent || "");
+            const textScope = isPdf
+                ? document.getElementById("pdf-text-layer")
+                : section;
+            const sectionText = cleanText(textScope?.textContent || "");
             if (!sectionText) {
                 return null;
             }
@@ -927,6 +1205,7 @@
                 pageNumber: currentVocabularyPage,
                 section,
                 isPhrase,
+                selectionAnchor: selectionAnchorForRange(range, textScope, selectedText),
             };
         }
 
@@ -946,7 +1225,11 @@
                 const payload = await response.json();
                 for (const entry of payload.words) {
                     rememberSavedWordEntry(entry, currentChapterIndex);
-                    highlightWord(entry.word, bookContent, currentChapterIndex, entry.page_number ?? currentVocabularyPage);
+                    if (isPdf) {
+                        highlightPdfEntry(entry, currentChapterIndex);
+                    } else {
+                        highlightWord(entry.word, bookContent, currentChapterIndex, entry.page_number ?? currentVocabularyPage);
+                    }
                 }
             } catch (error) {
                 console.warn("Saved words could not be loaded.", error);
@@ -989,7 +1272,8 @@
                             chapter_index: payload.chapterIndex,
                             page_number: payload.pageNumber,
                             sentence: payload.sentence,
-                            word: word
+                            word: word,
+                            selection_anchor: payload.selectionAnchor
                         })
                     });
 
@@ -999,7 +1283,14 @@
 
                     const savedEntry = await response.json();
                     rememberSavedWordEntry(savedEntry, payload.chapterIndex);
-                    highlightWord(word, payload.section, payload.chapterIndex, payload.pageNumber);
+                    if (isPdf) {
+                        highlightPdfEntry({
+                            ...savedEntry,
+                            selection_anchor: payload.selectionAnchor,
+                        }, payload.chapterIndex);
+                    } else {
+                        highlightWord(word, payload.section, payload.chapterIndex, payload.pageNumber);
+                    }
                     savedCount++;
 
                     if (savedEntry.ai_explanation_pending) {
@@ -1030,6 +1321,7 @@
         closeSidebarButton.addEventListener("click", closeSidebar);
         sidebarScrim.addEventListener("click", closeSidebar);
         saveWordButton.addEventListener("click", saveSelectedWord);
+        bookContent.addEventListener("dblclick", selectPdfWordAtPoint);
         bookContent.addEventListener("pointerover", (event) => {
             const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
             if (!target || !bookContent.contains(target)) {
@@ -1091,8 +1383,67 @@
 
         if (!maybeRedirectToSavedPage()) {
             rememberReadingPosition();
-            loadSavedWords();
+            if (isPdf) {
+                window.addEventListener("reader3:pdf-ready", loadSavedWords, { once: true });
+            } else {
+                loadSavedWords();
+            }
         }
     </script>
+    {% if book_format == "pdf" %}
+    <script type="module">
+        import * as pdfjsLib from "/static/vendor/pdfjs/pdf.min.mjs";
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/static/vendor/pdfjs/pdf.worker.min.mjs";
+        const loading = document.getElementById("pdf-loading");
+        const host = document.getElementById("pdf-page-host");
+        const canvas = document.getElementById("pdf-canvas");
+        const textLayerContainer = document.getElementById("pdf-text-layer");
+
+        try {
+            const task = pdfjsLib.getDocument("/read/{{ book_id|urlencode }}/source.pdf");
+            const documentProxy = await task.promise;
+            const page = await documentProxy.getPage({{ current_page }});
+            const baseViewport = page.getViewport({ scale: 1 });
+            const availableWidth = Math.max(280, Math.min(920, window.innerWidth - 64));
+            const scale = Math.min(2, availableWidth / baseViewport.width);
+            const viewport = page.getViewport({ scale });
+            const outputScale = window.devicePixelRatio || 1;
+
+            host.style.setProperty("--scale-factor", String(scale));
+            host.style.width = viewport.width + "px";
+            host.style.height = viewport.height + "px";
+            canvas.width = Math.floor(viewport.width * outputScale);
+            canvas.height = Math.floor(viewport.height * outputScale);
+            canvas.style.width = viewport.width + "px";
+            canvas.style.height = viewport.height + "px";
+
+            const context = canvas.getContext("2d");
+            await page.render({
+                canvasContext: context,
+                viewport,
+                transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
+            }).promise;
+
+            loading.remove();
+            const textContent = await page.getTextContent();
+            if (!textContent.items.some((item) => item.str && item.str.trim())) {
+                document.getElementById("pdf-text-warning").hidden = false;
+            }
+            const textLayer = new pdfjsLib.TextLayer({
+                textContentSource: textContent,
+                container: textLayerContainer,
+                viewport,
+            });
+            await textLayer.render();
+            window.dispatchEvent(new CustomEvent("reader3:pdf-ready"));
+        } catch (error) {
+            console.error("Could not render PDF page.", error);
+            loading.textContent = "This PDF page could not be rendered.";
+            loading.style.color = "#8b1e1e";
+            window.dispatchEvent(new CustomEvent("reader3:pdf-error"));
+        }
+    </script>
+    {% endif %}
 </body>
 </html>

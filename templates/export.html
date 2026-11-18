@@ -249,7 +249,7 @@
                                 >
                                     <span class="chapter-name">
                                         {% if not book_id %}{{ chapter.book_title }} · {% endif %}
-                                        Chapter {{ chapter.chapter_number }}
+                                        {{ chapter.location_label }}
                                     </span>
                                     <span class="chapter-count">{{ chapter.count }} words</span>
                                 </a>

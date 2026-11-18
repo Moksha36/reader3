@@ -496,12 +496,12 @@
                 </div>
                 <h1>Library</h1>
                 <p class="hero-copy">
-                    Pick up where you left off, or bring in a new EPUB without leaving the app.
+                    Pick up where you left off, or bring in a new EPUB or PDF without leaving the app.
                 </p>
             </section>
 
             <div id="empty-state" class="empty-state{% if books %} hidden{% endif %}">
-                No processed books found yet. Click <code>Add Books</code> to upload an EPUB and populate your library.
+                No processed books found yet. Click <code>Add Books</code> to upload an EPUB or PDF and populate your library.
             </div>
 
             <section class="book-grid" id="book-grid">
@@ -519,7 +519,7 @@
                                 <h2 class="book-title">{{ book.title }}</h2>
                             </div>
                             <p class="book-meta">{{ book.author or "Unknown author" }}</p>
-                            <span class="book-sections">{{ book.chapters }} sections</span>
+                            <span class="book-sections">{{ book.chapters }} {% if book.format == "pdf" %}pages{% else %}sections{% endif %}</span>
                         </a>
                     </article>
                 {% endfor %}
@@ -533,24 +533,24 @@
                 <div>
                     <h2 class="modal-title" id="upload-modal-title">Add Books</h2>
                     <p class="modal-copy">
-                        Drag an EPUB into the dropzone or click to choose a file. The server will process it, extract metadata, and add it to your library.
+                        Drag an EPUB or PDF into the dropzone or click to choose a file. The server will process it, extract metadata, and add it to your library.
                     </p>
                 </div>
                 <button type="button" class="modal-close" id="close-upload-modal" aria-label="Close upload modal">×</button>
             </div>
 
             <label class="dropzone" id="dropzone">
-                <input class="file-input" id="file-input" type="file" accept=".epub,application/epub+zip">
-                <div class="dropzone-title">Drag EPUB here</div>
+                <input class="file-input" id="file-input" type="file" accept=".epub,.pdf,application/epub+zip,application/pdf">
+                <div class="dropzone-title">Drag EPUB or PDF here</div>
                 <div class="dropzone-subtitle">or click <span class="upload-btn is-accent">Upload files</span> to choose a book</div>
-                <div class="upload-meta">Supported format: EPUB. Max size: 100 MB.</div>
+                <div class="upload-meta">Supported formats: EPUB and PDF. Max size: 100 MB.</div>
             </label>
 
             <div class="upload-footer">
                 <div class="upload-progress" aria-hidden="true">
                     <div class="upload-progress-bar" id="upload-progress-bar"></div>
                 </div>
-                <div class="upload-status" id="upload-status">Choose an EPUB to add it to your library.</div>
+                <div class="upload-status" id="upload-status">Choose an EPUB or PDF to add it to your library.</div>
             </div>
         </div>
     </div>
@@ -599,12 +599,13 @@
 
         function validateFile(file) {
             if (!file) {
-                return "Choose an EPUB file first.";
+                return "Choose an EPUB or PDF file first.";
             }
 
-            const isEpub = file.name.toLowerCase().endsWith(".epub");
-            if (!isEpub) {
-                return "Only EPUB uploads are supported.";
+            const lowerName = file.name.toLowerCase();
+            const isSupported = lowerName.endsWith(".epub") || lowerName.endsWith(".pdf");
+            if (!isSupported) {
+                return "Only EPUB and PDF uploads are supported.";
             }
 
             if (file.size > MAX_UPLOAD_BYTES) {
@@ -646,7 +647,7 @@
             });
             card.querySelector(".book-title").textContent = book.title;
             card.querySelector(".book-meta").textContent = book.author || "Unknown author";
-            card.querySelector(".book-sections").textContent = `${book.chapters} sections`;
+            card.querySelector(".book-sections").textContent = `${book.chapters} ${book.format === "pdf" ? "pages" : "sections"}`;
             return card;
         }
 
@@ -777,7 +778,7 @@
         }
 
         openUploadModalButton.addEventListener("click", () => {
-            setUploadStatus("Choose an EPUB to add it to your library.");
+            setUploadStatus("Choose an EPUB or PDF to add it to your library.");
             resetProgress();
             setModalOpen(true);
         });

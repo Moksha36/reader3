@@ -1,6 +1,4 @@
-"""
-Parses an EPUB file into a structured object that can be used to serve the book via a web interface.
-"""
+"""Parses EPUB files into the structured Reader3 book representation."""
 
 import os
 import pickle
@@ -65,6 +63,9 @@ class Book:
     source_file: str
     processed_at: str
     version: str = "3.0"
+    format: str = "epub"
+    page_count: int = 0
+    ocr_page_count: int = 0
 
 
 # --- Utilities ---
@@ -277,7 +278,9 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
         toc=toc_structure,
         images=image_map,
         source_file=os.path.basename(epub_path),
-        processed_at=datetime.now().isoformat()
+        processed_at=datetime.now().isoformat(),
+        format="epub",
+        page_count=len(spine_chapters),
     )
 
     return final_book
@@ -296,18 +299,24 @@ if __name__ == "__main__":
 
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python reader3.py <file.epub>")
+        print("Usage: python reader3.py <file.epub|file.pdf>")
         sys.exit(1)
 
-    epub_file = sys.argv[1]
-    assert os.path.exists(epub_file), "File not found."
-    out_dir = os.path.splitext(epub_file)[0] + "_data"
+    source_file = sys.argv[1]
+    assert os.path.exists(source_file), "File not found."
+    out_dir = os.path.splitext(source_file)[0] + "_data"
 
-    book_obj = process_epub(epub_file, out_dir)
+    if source_file.lower().endswith(".pdf"):
+        from pdf_processor import process_pdf
+        book_obj = process_pdf(source_file, out_dir)
+    elif source_file.lower().endswith(".epub"):
+        book_obj = process_epub(source_file, out_dir)
+    else:
+        raise SystemExit("Only EPUB and PDF files are supported.")
     save_to_pickle(book_obj, out_dir)
     print("\n--- Summary ---")
     print(f"Title: {book_obj.metadata.title}")
     print(f"Authors: {', '.join(book_obj.metadata.authors)}")
-    print(f"Physical Files (Spine): {len(book_obj.spine)}")
+    print(f"Reading Units: {len(book_obj.spine)}")
     print(f"TOC Root Items: {len(book_obj.toc)}")
     print(f"Images extracted: {len(book_obj.images)}")
