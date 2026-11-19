@@ -749,7 +749,7 @@
                                             </div>
 
                                             <div class="card-back-content">
-                                                {% if entry.pronunciation or entry.context_meaning %}
+                                                {% if entry.pronunciation or entry.context_meaning or entry.examples %}
                                                     {% if entry.pronunciation %}
                                                         <div class="meaning-block">
                                                             <div class="meaning-text">{{ entry.pronunciation }}</div>
@@ -759,6 +759,16 @@
                                                         <div class="meaning-block">
                                                             <div class="meaning-title">Context meaning</div>
                                                             <div class="meaning-text">{{ entry.context_meaning }}</div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if entry.examples %}
+                                                        <div class="meaning-block">
+                                                            <div class="meaning-title">Examples</div>
+                                                            <ol class="meaning-list">
+                                                                {% for example in entry.examples %}
+                                                                    <li>{{ example }}</li>
+                                                                {% endfor %}
+                                                            </ol>
                                                         </div>
                                                     {% endif %}
                                                 {% else %}

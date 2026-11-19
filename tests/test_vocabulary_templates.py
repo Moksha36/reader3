@@ -8,7 +8,15 @@ from tests.test_vocabulary_explanations import LEGACY_EXPLANATION
 
 
 class FlashcardTemplateTests(unittest.TestCase):
-    def render_flashcards(self) -> BeautifulSoup:
+    EXAMPLES = [
+        "This diagram is a clear example of symmetry.",
+        "Her response provides an example of calm leadership.",
+        "Use this calculation as an example when solving the next problem.",
+    ]
+
+    def render_flashcards(self, examples=None) -> BeautifulSoup:
+        if examples is None:
+            examples = self.EXAMPLES
         template = server.templates.env.get_template("flashcards.html")
         html = template.render(
             request=SimpleNamespace(
@@ -28,6 +36,7 @@ class FlashcardTemplateTests(unittest.TestCase):
                 "ai_explanation": LEGACY_EXPLANATION,
                 "pronunciation": "/ɪɡˈzæmpəl/",
                 "context_meaning": "A representative case used to explain an idea.",
+                "examples": examples,
                 "memorized": False,
                 "note": "",
                 "created_at": None,
@@ -64,6 +73,29 @@ class FlashcardTemplateTests(unittest.TestCase):
             page.get_text(" ", strip=True),
         )
         self.assertNotIn("General meaning", page.get_text(" ", strip=True))
+
+    def test_card_back_renders_exactly_three_generated_examples(self):
+        page = self.render_flashcards()
+        back = page.select_one(".card-back-content")
+
+        self.assertEqual(
+            [title.get_text(" ", strip=True) for title in back.select(".meaning-title")].count("Examples"),
+            1,
+        )
+        self.assertEqual(
+            [item.get_text(" ", strip=True) for item in back.select(".meaning-list > li")],
+            self.EXAMPLES,
+        )
+
+    def test_card_back_omits_examples_section_when_none_were_generated(self):
+        page = self.render_flashcards(examples=[])
+        back = page.select_one(".card-back-content")
+        back_text = back.get_text(" ", strip=True)
+
+        self.assertNotIn("Examples", back_text)
+        self.assertEqual(back.select(".meaning-list > li"), [])
+        self.assertIn("/ɪɡˈzæmpəl/", back_text)
+        self.assertIn("A representative case used to explain an idea.", back_text)
 
 
 class ReaderTemplateTests(unittest.TestCase):

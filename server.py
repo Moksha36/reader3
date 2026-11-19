@@ -1374,6 +1374,7 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
             "ai_explanation": row[6],
             "pronunciation": extract_pronunciation(row[6]),
             "context_meaning": extract_context_meaning(row[6]),
+            "examples": extract_examples(row[6]),
             "memorized": row[7],
             "note": row[8],
             "created_at": row[9],
