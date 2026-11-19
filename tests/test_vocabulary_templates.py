@@ -1,3 +1,4 @@
+import re
 import unittest
 from types import SimpleNamespace
 
@@ -56,10 +57,17 @@ class FlashcardTemplateTests(unittest.TestCase):
 
         self.assertIsNotNone(card)
         self.assertEqual(card.name, "div")
-        self.assertEqual(card.get("role"), "button")
-        self.assertEqual(card.get("tabindex"), "0")
+        self.assertIsNone(card.get("role"))
+        self.assertIsNone(card.get("tabindex"))
+        self.assertIsNone(card.get("aria-label"))
         self.assertIsNone(page.select_one(".card-front").get("inert"))
-        self.assertEqual(page.select_one(".card-back").get("inert"), "")
+        card_back = page.select_one(".card-back")
+        self.assertEqual(card_back.get("inert"), "")
+        self.assertEqual(card_back.get("role"), "region")
+        self.assertEqual(card_back.get("tabindex"), "0")
+        self.assertEqual(card_back.get("aria-label"), "Definition and examples for example")
+        self.assertIsNotNone(page.select_one("#flipCard"))
+        self.assertIsNone(card.select_one("#flipCard"))
         self.assertIsNotNone(page.find("script", src="/static/flashcard_interactions.js"))
         self.assertEqual(len(controls), 2)
         self.assertEqual(
@@ -96,6 +104,14 @@ class FlashcardTemplateTests(unittest.TestCase):
         self.assertEqual(back.select(".meaning-list > li"), [])
         self.assertIn("/ɪɡˈzæmpəl/", back_text)
         self.assertIn("A representative case used to explain an idea.", back_text)
+
+    def test_card_back_provides_scrolling_for_long_generated_examples(self):
+        page = self.render_flashcards(examples=["A long example sentence. " * 20] * 3)
+        stylesheet = page.find("style").get_text(" ", strip=True)
+        card_back_rule = re.search(r"\.card-back\s*\{([^}]*)\}", stylesheet)
+
+        self.assertIsNotNone(card_back_rule)
+        self.assertRegex(card_back_rule.group(1), r"overflow-y\s*:\s*auto")
 
 
 class ReaderTemplateTests(unittest.TestCase):

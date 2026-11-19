@@ -446,7 +446,9 @@
         .card-back {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
+            overflow-y: auto;
+            overscroll-behavior: contain;
             padding: 1.4rem 1.6rem;
             background:
                 radial-gradient(circle at top, rgba(242, 228, 188, 0.1), transparent 38%),
@@ -705,9 +707,6 @@
                                 data-word-id="{{ entry.id }}"
                                 data-word="{{ entry.word|e }}"
                                 data-memorized="{{ 'true' if entry.memorized else 'false' }}"
-                                role="button"
-                                tabindex="0"
-                                aria-label="Flip flashcard for {{ entry.word|e }}"
                                 {% if loop.index0 != 0 %}hidden{% endif %}
                             >
                                 <div class="flashcard-inner">
@@ -732,7 +731,13 @@
                                             <div class="card-tip">Space or Enter to flip</div>
                                         </div>
                                     </article>
-                                    <article class="card-face card-back" inert>
+                                    <article
+                                        class="card-face card-back"
+                                        role="region"
+                                        tabindex="0"
+                                        aria-label="Definition and examples for {{ entry.word|e }}"
+                                        inert
+                                    >
                                         <div class="card-back-inner">
                                             <div class="card-meta">{{ entry.book_title }} · Explanation</div>
                                             <div class="word-with-pronunciation">
@@ -899,13 +904,17 @@
                 const card = currentCard();
                 card.hidden = false;
                 card.classList.add("is-active");
-                card.focus({ preventScroll: true });
                 updateUi();
+                flipCardButton.focus({ preventScroll: true });
             }
 
             function flipCurrentCard() {
                 currentCard().classList.toggle("is-flipped");
                 updateUi();
+                const focusTarget = currentCard().classList.contains("is-flipped")
+                    ? currentCard().querySelector(".card-back")
+                    : flipCardButton;
+                focusTarget.focus({ preventScroll: true });
             }
 
             function updateUi() {

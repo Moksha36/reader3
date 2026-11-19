@@ -41,17 +41,18 @@ DETAILED_EXPLANATION = """
 
 
 class FakeResponses:
-    def __init__(self):
+    def __init__(self, output_text):
         self.request = None
+        self.output_text = output_text
 
     def create(self, **kwargs):
         self.request = kwargs
-        return SimpleNamespace(output_text="generated explanation")
+        return SimpleNamespace(output_text=self.output_text)
 
 
 class FakeOpenAIClient:
-    def __init__(self):
-        self.responses = FakeResponses()
+    def __init__(self, output_text=DETAILED_EXPLANATION):
+        self.responses = FakeResponses(output_text)
 
 
 class VocabularyExplanationTests(unittest.TestCase):
@@ -68,7 +69,7 @@ class VocabularyExplanationTests(unittest.TestCase):
             server.openai_client = previous_client
 
         system_prompt = fake_client.responses.request["input"][0]["content"]
-        self.assertEqual(result, "generated explanation")
+        self.assertEqual(result, DETAILED_EXPLANATION.strip())
         self.assertEqual(system_prompt.count('<div class="meaning-block">'), 3)
         self.assertIn("Context meaning", system_prompt)
         self.assertIn("Use 2 to 4 concise sentences", system_prompt)
@@ -96,6 +97,40 @@ class VocabularyExplanationTests(unittest.TestCase):
 
     def test_legacy_explanation_without_examples_returns_empty_list(self):
         self.assertEqual(server.extract_examples(LEGACY_EXPLANATION), [])
+
+    def test_examples_require_exactly_three_flat_list_items(self):
+        malformed_explanations = {
+            "two items": DETAILED_EXPLANATION.replace(
+                "    <li>Use this calculation as an example when solving the next problem.</li>\n",
+                "",
+            ),
+            "four items": DETAILED_EXPLANATION.replace(
+                "  </ol>",
+                "    <li>A fourth example must be rejected.</li>\n  </ol>",
+            ),
+            "nested list": DETAILED_EXPLANATION.replace(
+                "<li>This diagram is a clear <strong>example</strong> of symmetry.</li>",
+                "<li>This diagram is an example.<ul><li>Nested text</li></ul></li>",
+            ),
+        }
+
+        for label, explanation in malformed_explanations.items():
+            with self.subTest(label=label):
+                self.assertEqual(server.extract_examples(explanation), [])
+
+    def test_translation_rejects_malformed_model_response(self):
+        fake_client = FakeOpenAIClient("<div class=\"meaning-block\">incomplete</div>")
+        previous_client = server.openai_client
+        server.openai_client = fake_client
+        try:
+            result = server.translate_word_with_openai(
+                "example",
+                "This is an example sentence.",
+            )
+        finally:
+            server.openai_client = previous_client
+
+        self.assertEqual(result, "")
 
 
 class VocabularyExportTests(unittest.TestCase):

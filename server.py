@@ -274,13 +274,37 @@ def extract_examples(ai_explanation: str) -> list[str]:
         if not example_list:
             return []
 
-        return [
+        items = example_list.find_all("li", recursive=False)
+        if len(items) != 3 or any(item.find(["ol", "ul", "li"]) for item in items):
+            return []
+
+        examples = [
             " ".join(item.get_text(" ", strip=True).split())
-            for item in example_list.find_all("li", recursive=False)
-            if item.get_text(" ", strip=True)
+            for item in items
         ]
+        return examples if all(examples) else []
 
     return []
+
+
+def is_valid_vocabulary_explanation(ai_explanation: str) -> bool:
+    soup = BeautifulSoup(ai_explanation or "", "html.parser")
+    blocks = soup.select(".meaning-block")
+    if len(blocks) != 3:
+        return False
+
+    titles = [
+        " ".join((block.select_one(".meaning-title") or "").get_text(" ", strip=True).split()).casefold()
+        if block.select_one(".meaning-title")
+        else ""
+        for block in blocks
+    ]
+    return (
+        titles == ["", "context meaning", "examples"]
+        and bool(extract_pronunciation(ai_explanation))
+        and bool(extract_context_meaning(ai_explanation))
+        and len(extract_examples(ai_explanation)) == 3
+    )
 
 
 def vocabulary_export_row(word: str, sentence: str, ai_explanation: str) -> list[str]:
@@ -376,7 +400,7 @@ def translate_word_with_openai(word: str, sentence: str) -> str:
         return ""
 
     explanation = (response.output_text or "").strip()
-    return explanation
+    return explanation if is_valid_vocabulary_explanation(explanation) else ""
 
 
 def populate_ai_explanation(

@@ -13,6 +13,68 @@ const window = {};
 vm.runInNewContext(source, { window });
 const api = window.Reader3ReaderInteractions;
 
+test("punctuation around a selected phrase does not discard its last word", () => {
+  assert.deepEqual(
+    plain(api.parseVocabularySelection("hold on.")),
+    { selectedText: "hold on", words: ["hold on"], isPhrase: true },
+  );
+  assert.deepEqual(
+    plain(api.parseVocabularySelection("“hold on”")),
+    { selectedText: "hold on", words: ["hold on"], isPhrase: true },
+  );
+  assert.deepEqual(
+    plain(api.parseVocabularySelection("meticulous,")),
+    { selectedText: "meticulous", words: ["meticulous"], isPhrase: false },
+  );
+});
+
+test("structured output without context does not expose examples as meaning", () => {
+  const examplesOnly = fakeFragment(
+    [fakeMeaningBlock("Examples", "First example. Second example. Third example.")],
+    "Examples First example. Second example. Third example.",
+  );
+  const context = fakeFragment(
+    [
+      fakeMeaningBlock("Pronunciation", "/test/"),
+      fakeMeaningBlock("Context meaning", "  Meaning in this sentence.  "),
+      fakeMeaningBlock("Examples", "Three examples."),
+    ],
+    "/test/ Context meaning Meaning in this sentence. Examples Three examples.",
+  );
+  const unstructuredLegacy = fakeFragment([], "  A legacy plain-text meaning.  ");
+
+  assert.equal(api.contextMeaningFromFragment(examplesOnly), "");
+  assert.equal(api.contextMeaningFromFragment(context), "Meaning in this sentence.");
+  assert.equal(api.contextMeaningFromFragment(unstructuredLegacy), "A legacy plain-text meaning.");
+});
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function fakeMeaningBlock(title, text) {
+  return {
+    querySelector(selector) {
+      if (selector === ".meaning-title") {
+        return { textContent: title };
+      }
+      if (selector === ".meaning-text") {
+        return { textContent: text };
+      }
+      return null;
+    },
+  };
+}
+
+function fakeFragment(blocks, textContent) {
+  return {
+    textContent,
+    querySelectorAll(selector) {
+      return selector === ".meaning-block" ? blocks : [];
+    },
+  };
+}
+
 test("PDF saved words can be resolved from pointer coordinates", () => {
   const first = highlight({ left: 10, top: 20, right: 60, bottom: 40 });
   const second = highlight({ left: 70, top: 20, right: 120, bottom: 40 });

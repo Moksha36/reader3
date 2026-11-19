@@ -1026,18 +1026,7 @@
 
             const template = document.createElement("template");
             template.innerHTML = aiExplanation;
-            const blocks = template.content.querySelectorAll(".meaning-block");
-
-            for (const block of blocks) {
-                const title = cleanText(block.querySelector(".meaning-title")?.textContent || "");
-                if (title.toLocaleLowerCase() !== "context meaning") {
-                    continue;
-                }
-
-                return cleanText(block.querySelector(".meaning-text")?.textContent || "");
-            }
-
-            return cleanText(template.content.textContent || "");
+            return window.Reader3ReaderInteractions.contextMeaningFromFragment(template.content);
         }
 
         function rememberSavedWordEntry(entry, chapterIndex = currentChapterIndex) {
@@ -1257,23 +1246,11 @@
                 return null;
             }
 
-            const selectedText = selection.toString().trim();
-            if (!selectedText) {
+            const parsedSelection = window.Reader3ReaderInteractions.parseVocabularySelection(selection.toString());
+            if (!parsedSelection) {
                 return null;
             }
-
-            // Split into words and filter valid ones
-            const words = selectedText.split(/\s+/).filter(word =>
-                /^[\p{L}\p{N}][\p{L}\p{N}'’-]*$/u.test(word)
-            );
-
-            if (words.length === 0) {
-                return null;
-            }
-
-            // If more than 1 word, treat as a phrase
-            const isPhrase = words.length > 1;
-            const finalWords = isPhrase ? [selectedText] : words;
+            const { selectedText, words: finalWords, isPhrase } = parsedSelection;
 
             const section = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
                 ? range.commonAncestorContainer.parentElement?.closest(".book-section")
@@ -1290,7 +1267,7 @@
                 return null;
             }
 
-            const cleanedSelectedText = cleanText(selection.toString());
+            const cleanedSelectedText = cleanText(selectedText);
             const matchIndex = sectionText.toLocaleLowerCase().indexOf(cleanedSelectedText.toLocaleLowerCase());
             const bounds = sentenceBounds(sectionText, Math.max(0, matchIndex));
             const sentence = cleanText(sectionText.slice(bounds.start, bounds.end)) || sectionText;
