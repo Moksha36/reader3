@@ -63,5 +63,41 @@ class FlashcardTemplateTests(unittest.TestCase):
         self.assertNotIn("General meaning", page.get_text(" ", strip=True))
 
 
+class ReaderTemplateTests(unittest.TestCase):
+    def render_reader(self) -> BeautifulSoup:
+        template = server.templates.env.get_template("reader.html")
+        html = template.render(
+            book=SimpleNamespace(
+                metadata=SimpleNamespace(title="Sample Book", authors=["Reader3 Tests"]),
+                toc=[],
+            ),
+            book_id="sample_data",
+            book_format="epub",
+            current_chapter_index=0,
+            current_page=1,
+            current_page_html="<p>An example sentence.</p>",
+            next_page=None,
+            prev_page=None,
+            toc_page_map={},
+            total_pages=1,
+        )
+        return BeautifulSoup(html, "html.parser")
+
+    def test_reader_tooltip_has_standalone_pronunciation_control(self):
+        page = self.render_reader()
+        speech_script = page.find("script", src="/static/speech.js")
+        tooltip = page.select_one("#meaning-tooltip")
+        word = page.select_one("#meaning-tooltip-word")
+        control = page.select_one("#meaning-tooltip-pronounce")
+
+        self.assertIsNotNone(speech_script)
+        self.assertIsNotNone(tooltip)
+        self.assertIsNotNone(word)
+        self.assertIsNotNone(control)
+        self.assertEqual(control.name, "button")
+        self.assertEqual(control.get("aria-label"), "Pronounce saved word")
+        self.assertIsNone(control.find_parent(class_="saved-word"))
+
+
 if __name__ == "__main__":
     unittest.main()

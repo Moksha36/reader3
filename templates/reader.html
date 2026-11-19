@@ -361,6 +361,54 @@
         .meaning-tooltip.visible {
             opacity: 1;
             transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .meaning-tooltip-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.65rem;
+        }
+
+        .meaning-tooltip-word {
+            color: #fffdf8;
+            font-size: 1.05rem;
+            font-weight: 750;
+            overflow-wrap: anywhere;
+        }
+
+        .meaning-tooltip-pronounce {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            border: 1px solid rgba(242, 228, 188, 0.25);
+            border-radius: 999px;
+            background: rgba(242, 228, 188, 0.08);
+            color: var(--accent);
+            cursor: pointer;
+        }
+
+        .meaning-tooltip-pronounce:hover,
+        .meaning-tooltip-pronounce:focus-visible {
+            border-color: rgba(242, 228, 188, 0.5);
+            background: rgba(242, 228, 188, 0.14);
+            outline: none;
+        }
+
+        .meaning-tooltip-pronounce:disabled {
+            display: none;
+        }
+
+        .meaning-tooltip-pronounce svg {
+            width: 19px;
+            height: 19px;
+            fill: currentColor;
         }
 
         .meaning-tooltip-title {
@@ -619,11 +667,24 @@
 
         <div class="reader-toast" id="reader-toast" role="status" aria-live="polite"></div>
         <div class="meaning-tooltip" id="meaning-tooltip" role="tooltip" aria-hidden="true">
+            <div class="meaning-tooltip-header">
+                <div class="meaning-tooltip-word" id="meaning-tooltip-word"></div>
+                <button
+                    type="button"
+                    class="meaning-tooltip-pronounce"
+                    id="meaning-tooltip-pronounce"
+                    aria-label="Pronounce saved word"
+                    title="Play generated pronunciation"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zm-2.5-8.6v2.07a7 7 0 0 1 0 13.06v2.07a9 9 0 0 0 0-17.2z"/></svg>
+                </button>
+            </div>
             <div class="meaning-tooltip-title">Context meaning</div>
             <div class="meaning-tooltip-text" id="meaning-tooltip-text"></div>
         </div>
     </div>
 
+    <script src="/static/speech.js"></script>
     <script>
         const body = document.body;
         const bookContent = document.getElementById("book-content");
@@ -636,7 +697,9 @@
         const prevZone = document.getElementById("prev-zone");
         const nextZone = document.getElementById("next-zone");
         const meaningTooltip = document.getElementById("meaning-tooltip");
+        const meaningTooltipWord = document.getElementById("meaning-tooltip-word");
         const meaningTooltipText = document.getElementById("meaning-tooltip-text");
+        const meaningTooltipPronounce = document.getElementById("meaning-tooltip-pronounce");
         const bookId = "{{ book_id }}";
         const currentPage = {{ current_page }};
         const currentChapterIndex = {{ current_chapter_index }};
@@ -644,10 +707,11 @@
         const currentVocabularyPage = isPdf ? currentPage : 1;
         const progressStorageKey = "reader3-progress:" + bookId;
         const savedWords = new Set();
-        const savedWordMeanings = new Map();
+        const savedWordEntries = new Map();
         const explanationFetches = new Map();
         let toastTimer = null;
         let activeMeaningTarget = null;
+        let meaningTooltipHideTimer = null;
 
         function openSidebar() {
             body.classList.add("sidebar-open");
@@ -908,7 +972,7 @@
                 mark.className = "saved-word pdf-highlight";
                 mark.dataset.word = normalizeWord(entry.word);
                 mark.dataset.key = key;
-                mark.dataset.hasMeaning = savedWordMeanings.has(key) ? "true" : "false";
+                mark.dataset.hasMeaning = savedWordEntries.get(key)?.meaning ? "true" : "false";
                 mark.style.left = (rect.left - hostRect.left) + "px";
                 mark.style.top = (rect.top - hostRect.top) + "px";
                 mark.style.width = rect.width + "px";
@@ -975,9 +1039,10 @@
             savedWords.add(key);
 
             const contextMeaning = extractContextMeaning(entry.ai_explanation || "");
-            if (contextMeaning) {
-                savedWordMeanings.set(key, contextMeaning);
-            }
+            savedWordEntries.set(key, {
+                word: cleanText(entry.word || ""),
+                meaning: contextMeaning,
+            });
 
             return key;
         }
@@ -986,7 +1051,7 @@
             scope.querySelectorAll(".saved-word").forEach((mark) => {
                 const key = mark.dataset.key || savedWordKey(currentChapterIndex, currentVocabularyPage, mark.dataset.word || mark.textContent);
                 mark.dataset.key = key;
-                mark.dataset.hasMeaning = savedWordMeanings.has(key) ? "true" : "false";
+                mark.dataset.hasMeaning = savedWordEntries.get(key)?.meaning ? "true" : "false";
             });
         }
 
@@ -1022,7 +1087,7 @@
                     mark.className = "saved-word";
                     mark.dataset.word = normalized;
                     mark.dataset.key = key;
-                    mark.dataset.hasMeaning = savedWordMeanings.has(key) ? "true" : "false";
+                    mark.dataset.hasMeaning = savedWordEntries.get(key)?.meaning ? "true" : "false";
                     mark.textContent = matchedWord;
                     fragment.appendChild(mark);
 
@@ -1060,18 +1125,36 @@
             meaningTooltip.style.left = left + "px";
         }
 
-        function showMeaningTooltip(target, text) {
+        function cancelMeaningTooltipHide() {
+            if (meaningTooltipHideTimer) {
+                window.clearTimeout(meaningTooltipHideTimer);
+                meaningTooltipHideTimer = null;
+            }
+        }
+
+        function showMeaningTooltip(target, entry) {
+            cancelMeaningTooltipHide();
             activeMeaningTarget = target;
-            meaningTooltipText.textContent = text || "AI explanation is still being generated.";
+            const word = cleanText(entry?.word || target.dataset.word || target.textContent || "");
+            meaningTooltipWord.textContent = word;
+            meaningTooltipText.textContent = entry?.meaning || "AI explanation is still being generated.";
+            meaningTooltipPronounce.dataset.pronunciation = word;
+            meaningTooltipPronounce.disabled = !word || !window.Reader3Speech.isSupported();
             meaningTooltip.classList.add("visible");
             meaningTooltip.setAttribute("aria-hidden", "false");
             positionMeaningTooltip(target);
         }
 
         function hideMeaningTooltip() {
+            cancelMeaningTooltipHide();
             activeMeaningTarget = null;
             meaningTooltip.classList.remove("visible");
             meaningTooltip.setAttribute("aria-hidden", "true");
+        }
+
+        function scheduleMeaningTooltipHide() {
+            cancelMeaningTooltipHide();
+            meaningTooltipHideTimer = window.setTimeout(hideMeaningTooltip, 160);
         }
 
         async function refreshSavedWordMeanings() {
@@ -1113,15 +1196,19 @@
 
         async function handleSavedWordPointerEnter(target) {
             const key = target.dataset.key || savedWordKey(currentChapterIndex, currentVocabularyPage, target.dataset.word || target.textContent);
-            showMeaningTooltip(target, savedWordMeanings.get(key));
+            const fallbackEntry = {
+                word: cleanText(target.dataset.word || target.textContent || ""),
+                meaning: "",
+            };
+            showMeaningTooltip(target, savedWordEntries.get(key) || fallbackEntry);
 
-            if (savedWordMeanings.has(key)) {
+            if (savedWordEntries.get(key)?.meaning) {
                 return;
             }
 
             await refreshSavedWordMeanings();
             if (activeMeaningTarget === target) {
-                showMeaningTooltip(target, savedWordMeanings.get(key));
+                showMeaningTooltip(target, savedWordEntries.get(key) || fallbackEntry);
             }
         }
 
@@ -1321,6 +1408,11 @@
         closeSidebarButton.addEventListener("click", closeSidebar);
         sidebarScrim.addEventListener("click", closeSidebar);
         saveWordButton.addEventListener("click", saveSelectedWord);
+        meaningTooltipPronounce.addEventListener("click", () => {
+            window.Reader3Speech.speak(meaningTooltipPronounce.dataset.pronunciation || "");
+        });
+        meaningTooltip.addEventListener("pointerenter", cancelMeaningTooltipHide);
+        meaningTooltip.addEventListener("pointerleave", scheduleMeaningTooltipHide);
         bookContent.addEventListener("dblclick", selectPdfWordAtPoint);
         bookContent.addEventListener("pointerover", (event) => {
             const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
@@ -1333,14 +1425,19 @@
         bookContent.addEventListener("pointerout", (event) => {
             const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
             const nextTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
-            if (!target || (nextTarget && target.contains(nextTarget))) {
+            if (
+                !target
+                || (nextTarget && target.contains(nextTarget))
+                || (nextTarget && meaningTooltip.contains(nextTarget))
+            ) {
                 return;
             }
 
-            hideMeaningTooltip();
+            scheduleMeaningTooltipHide();
         });
         window.addEventListener("scroll", hideMeaningTooltip, true);
         window.addEventListener("resize", hideMeaningTooltip);
+        window.addEventListener("pagehide", () => window.Reader3Speech.stop());
 
         document.addEventListener("keydown", (event) => {
             const target = event.target;
