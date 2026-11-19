@@ -54,6 +54,29 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else
 upload_jobs: dict[str, dict] = {}
 upload_jobs_lock = threading.Lock()
 
+VOCABULARY_EXPLANATION_SYSTEM_PROMPT = (
+    "Return HTML only. "
+    "Do not return markdown. "
+    "Do not use <center>. "
+    "Do not wrap everything in one <p>. "
+    "Output exactly two blocks in this structure: "
+    '<div class="meaning-block">'
+    '<div class="meaning-text">/.../</div>'
+    "</div>"
+    '<div class="meaning-block">'
+    '<div class="meaning-title">Context meaning</div>'
+    '<div class="meaning-text">...</div>'
+    "</div>"
+    "Rules: "
+    "For the first block, provide only the word pronunciation using IPA symbols, wrapped in slash marks. "
+    "Do not include a title or label for the pronunciation block. "
+    "If the selected text is a phrase, provide a natural pronunciation for the full phrase. "
+    "For the second block, explain the meaning of the word in this specific sentence only. "
+    "Keep it short, clear, and concise. "
+    "Keep the second block title exactly as 'Context meaning'. "
+    "Output valid HTML fragments only."
+)
+
 VOCABULARY_ENTRY_SCHEMA = {
     "type": "object",
     "properties": {
@@ -296,45 +319,7 @@ def translate_word_with_openai(word: str, sentence: str) -> str:
             input=[
                 {
                     "role": "system",
-                    "content": (
-                    "Return HTML only. "
-                    "Do not return markdown. "
-                    "Do not use <center>. "
-                    "Do not wrap everything in one <p>. "
-
-                    "Output exactly three blocks in this structure: "
-
-                    '<div class="meaning-block">'
-                    '<div class="meaning-text">/.../</div>'
-                    '</div>'
-
-                    '<div class="meaning-block">'
-                    '<div class="meaning-title">Context meaning</div>'
-                    '<div class="meaning-text">...</div>'
-                    '</div>'
-
-                    '<div class="meaning-block">'
-                    '<div class="meaning-title">General meaning</div>'
-                    '<ol class="meaning-list">'
-                    '<li>...</li>'
-                    '<li>...</li>'
-                    '</ol>'
-                    '</div>'
-
-                    "Rules: "
-                    "For the first block, provide only the word pronunciation using IPA symbols, wrapped in slash marks. "
-                    "Do not include a title or label for the pronunciation block. "
-                    "If the selected text is a phrase, provide a natural pronunciation for the full phrase. "
-                    "For the second block, explain the meaning of the word in this specific sentence only. "
-                    "Keep it short, clear, and concise. "
-
-                    "For the third block, give 1 to 3 general meanings of the word. "
-                    "Each meaning must be one <li>. "
-
-                    "Keep the second and third block titles exactly as "
-                    "'Context meaning' and 'General meaning'. "
-                    "Output valid HTML fragments only."
-                ),
+                    "content": VOCABULARY_EXPLANATION_SYSTEM_PROMPT,
                 },
                 {
                     "role": "user",
@@ -1352,6 +1337,8 @@ async def vocabulary_flashcards_view(request: Request, book_id: Optional[str] = 
             "sentence": row[5],
             "highlighted_sentence": highlight_word_in_sentence(row[5], row[4]),
             "ai_explanation": row[6],
+            "pronunciation": extract_pronunciation(row[6]),
+            "context_meaning": extract_context_meaning(row[6]),
             "memorized": row[7],
             "note": row[8],
             "created_at": row[9],
