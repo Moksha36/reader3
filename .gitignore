@@ -18,3 +18,4 @@ wheels/
 *.epub
 *.pdf
 node_modules/
+.worktrees/
