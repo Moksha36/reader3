@@ -20,6 +20,25 @@ LEGACY_EXPLANATION = """
 </div>
 """
 
+DETAILED_EXPLANATION = """
+<div class="meaning-block">
+  <div class="meaning-text">/ɪɡˈzæmpəl/</div>
+</div>
+<div class="meaning-block">
+  <div class="meaning-title">Context meaning</div>
+  <div class="meaning-text">Here it means a representative case. The writer uses it to make an abstract point concrete.</div>
+</div>
+<div class="meaning-block">
+  <div class="meaning-title">Examples</div>
+  This text is not an example sentence.
+  <ol class="meaning-list">
+    <li>This diagram is a clear <strong>example</strong> of symmetry.</li>
+    <li>Her response provides an example of calm leadership.</li>
+    <li>Use this calculation as an example when solving the next problem.</li>
+  </ol>
+</div>
+"""
+
 
 class FakeResponses:
     def __init__(self):
@@ -36,7 +55,7 @@ class FakeOpenAIClient:
 
 
 class VocabularyExplanationTests(unittest.TestCase):
-    def test_translation_requests_only_pronunciation_and_context_blocks(self):
+    def test_translation_requests_detailed_context_and_three_same_sense_examples(self):
         fake_client = FakeOpenAIClient()
         previous_client = server.openai_client
         server.openai_client = fake_client
@@ -50,8 +69,12 @@ class VocabularyExplanationTests(unittest.TestCase):
 
         system_prompt = fake_client.responses.request["input"][0]["content"]
         self.assertEqual(result, "generated explanation")
-        self.assertEqual(system_prompt.count('<div class="meaning-block">'), 2)
+        self.assertEqual(system_prompt.count('<div class="meaning-block">'), 3)
         self.assertIn("Context meaning", system_prompt)
+        self.assertIn("Use 2 to 4 concise sentences", system_prompt)
+        self.assertIn('<div class="meaning-title">Examples</div>', system_prompt)
+        self.assertEqual(system_prompt.count("<li>...</li>"), 3)
+        self.assertIn("same contextual sense", system_prompt)
         self.assertNotIn("General meaning", system_prompt)
 
     def test_legacy_explanation_keeps_pronunciation_and_context_available(self):
@@ -60,6 +83,19 @@ class VocabularyExplanationTests(unittest.TestCase):
             server.extract_context_meaning(LEGACY_EXPLANATION),
             "A representative case used to explain an idea.",
         )
+
+    def test_examples_are_normalized_from_direct_list_items(self):
+        self.assertEqual(
+            server.extract_examples(DETAILED_EXPLANATION),
+            [
+                "This diagram is a clear example of symmetry.",
+                "Her response provides an example of calm leadership.",
+                "Use this calculation as an example when solving the next problem.",
+            ],
+        )
+
+    def test_legacy_explanation_without_examples_returns_empty_list(self):
+        self.assertEqual(server.extract_examples(LEGACY_EXPLANATION), [])
 
 
 class VocabularyExportTests(unittest.TestCase):

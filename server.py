@@ -59,7 +59,7 @@ VOCABULARY_EXPLANATION_SYSTEM_PROMPT = (
     "Do not return markdown. "
     "Do not use <center>. "
     "Do not wrap everything in one <p>. "
-    "Output exactly two blocks in this structure: "
+    "Output exactly three blocks in this structure: "
     '<div class="meaning-block">'
     '<div class="meaning-text">/.../</div>'
     "</div>"
@@ -67,13 +67,26 @@ VOCABULARY_EXPLANATION_SYSTEM_PROMPT = (
     '<div class="meaning-title">Context meaning</div>'
     '<div class="meaning-text">...</div>'
     "</div>"
+    '<div class="meaning-block">'
+    '<div class="meaning-title">Examples</div>'
+    '<ol class="meaning-list">'
+    "<li>...</li>"
+    "<li>...</li>"
+    "<li>...</li>"
+    "</ol>"
+    "</div>"
     "Rules: "
     "For the first block, provide only the word pronunciation using IPA symbols, wrapped in slash marks. "
     "Do not include a title or label for the pronunciation block. "
     "If the selected text is a phrase, provide a natural pronunciation for the full phrase. "
     "For the second block, explain the meaning of the word in this specific sentence only. "
-    "Keep it short, clear, and concise. "
+    "Use 2 to 4 concise sentences that explain the selected sense, its nuance, and why it fits the source sentence. "
+    "Do not add unrelated general definitions. "
     "Keep the second block title exactly as 'Context meaning'. "
+    "For the third block, provide exactly three distinct, natural example sentences. "
+    "Each example must use the selected word or phrase naturally in the same contextual sense. "
+    "Make the examples different from the source sentence and from one another. "
+    "Keep the third block title exactly as 'Examples'. "
     "Output valid HTML fragments only."
 )
 VOCABULARY_EXPORT_HEADER = ["word", "", "", "context meaning", "", "", "", "sentence"]
@@ -247,6 +260,27 @@ def extract_pronunciation(ai_explanation: str) -> str:
             return pronunciation
 
     return ""
+
+
+def extract_examples(ai_explanation: str) -> list[str]:
+    soup = BeautifulSoup(ai_explanation or "", "html.parser")
+
+    for block in soup.select(".meaning-block"):
+        title = block.select_one(".meaning-title")
+        if not title or " ".join(title.get_text(" ", strip=True).split()).casefold() != "examples":
+            continue
+
+        example_list = block.select_one("ol.meaning-list")
+        if not example_list:
+            return []
+
+        return [
+            " ".join(item.get_text(" ", strip=True).split())
+            for item in example_list.find_all("li", recursive=False)
+            if item.get_text(" ", strip=True)
+        ]
+
+    return []
 
 
 def vocabulary_export_row(word: str, sentence: str, ai_explanation: str) -> list[str]:
