@@ -221,9 +221,11 @@
             flex: 0 1 760px;
             width: min(100%, 760px);
             min-height: 520px;
+            padding: 0;
             border: 1px solid var(--panel-border);
             border-radius: 30px;
             background: transparent;
+            color: inherit;
             cursor: pointer;
             perspective: 1600px;
         }
@@ -376,6 +378,48 @@
             word-break: break-word;
         }
 
+        .word-with-pronunciation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            width: 100%;
+        }
+
+        .pronounce-button {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border: 1px solid rgba(242, 228, 188, 0.25);
+            border-radius: 999px;
+            background: rgba(242, 228, 188, 0.08);
+            color: var(--accent);
+            cursor: pointer;
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .pronounce-button:hover,
+        .pronounce-button:focus-visible {
+            transform: translateY(-1px);
+            border-color: rgba(242, 228, 188, 0.5);
+            background: rgba(242, 228, 188, 0.14);
+            outline: none;
+        }
+
+        .pronounce-button:disabled {
+            display: none;
+        }
+
+        .pronounce-button svg {
+            width: 21px;
+            height: 21px;
+            fill: currentColor;
+        }
+
         .sentence {
             margin: 0;
             font-size: clamp(1rem, 1.8vw, 1.1rem);
@@ -423,13 +467,17 @@
         }
 
         .card-back-word {
-            margin: 0 0 0.8rem 0;
+            margin: 0;
             font-size: clamp(2rem, 3.8vw, 3.4rem);
             line-height: 1.02;
             letter-spacing: -0.04em;
             color: #fffdf8;
             font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-weight: 800;
+        }
+
+        .card-back-inner > .word-with-pronunciation {
+            margin-bottom: 0.8rem;
         }
 
         .card-back-content {
@@ -626,6 +674,7 @@
             }
         }
     </style>
+    <script src="/static/speech.js"></script>
 </head>
 <body>
     <main class="shell">
@@ -649,12 +698,14 @@
                 <section class="study-panel">
                     <div class="reviewer">
                         {% for entry in flashcards %}
-                            <button
-                                type="button"
+                            <div
                                 class="flashcard{% if loop.index0 == 0 %} is-active{% endif %}"
                                 data-index="{{ loop.index0 }}"
                                 data-word-id="{{ entry.id }}"
+                                data-word="{{ entry.word|e }}"
                                 data-memorized="{{ 'true' if entry.memorized else 'false' }}"
+                                role="button"
+                                tabindex="0"
                                 aria-label="Flip flashcard for {{ entry.word|e }}"
                                 {% if loop.index0 != 0 %}hidden{% endif %}
                             >
@@ -662,7 +713,18 @@
                                     <article class="card-face card-front">
                                         <div class="card-front-top">
                                             <div class="card-meta">{{ entry.book_title }} · {{ entry.location_label }}</div>
-                                            <h2 class="word">{{ entry.word }}</h2>
+                                            <div class="word-with-pronunciation">
+                                                <h2 class="word">{{ entry.word }}</h2>
+                                                <button
+                                                    type="button"
+                                                    class="pronounce-button"
+                                                    data-pronunciation="{{ entry.word|e }}"
+                                                    aria-label="Pronounce {{ entry.word|e }}"
+                                                    title="Play generated pronunciation"
+                                                >
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zm-2.5-8.6v2.07a7 7 0 0 1 0 13.06v2.07a9 9 0 0 0 0-17.2z"/></svg>
+                                                </button>
+                                            </div>
                                         </div>
                                         <div class="card-front-bottom">
                                             <p class="sentence">{{ entry.highlighted_sentence | safe }}</p>
@@ -672,11 +734,32 @@
                                     <article class="card-face card-back">
                                         <div class="card-back-inner">
                                             <div class="card-meta">{{ entry.book_title }} · Explanation</div>
-                                            <h2 class="card-back-word">{{ entry.word }}</h2>
+                                            <div class="word-with-pronunciation">
+                                                <h2 class="card-back-word">{{ entry.word }}</h2>
+                                                <button
+                                                    type="button"
+                                                    class="pronounce-button"
+                                                    data-pronunciation="{{ entry.word|e }}"
+                                                    aria-label="Pronounce {{ entry.word|e }}"
+                                                    title="Play generated pronunciation"
+                                                >
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zm-2.5-8.6v2.07a7 7 0 0 1 0 13.06v2.07a9 9 0 0 0 0-17.2z"/></svg>
+                                                </button>
+                                            </div>
 
                                             <div class="card-back-content">
-                                                {% if entry.ai_explanation %}
-                                                    {{ entry.ai_explanation | safe }}
+                                                {% if entry.pronunciation or entry.context_meaning %}
+                                                    {% if entry.pronunciation %}
+                                                        <div class="meaning-block">
+                                                            <div class="meaning-text">{{ entry.pronunciation }}</div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if entry.context_meaning %}
+                                                        <div class="meaning-block">
+                                                            <div class="meaning-title">Context meaning</div>
+                                                            <div class="meaning-text">{{ entry.context_meaning }}</div>
+                                                        </div>
+                                                    {% endif %}
                                                 {% else %}
                                                     <div class="meaning-block">
                                                         <div class="meaning-title">Context meaning</div>
@@ -689,7 +772,7 @@
                                         </div>
                                     </article>
                                 </div>
-                            </button>
+                            </div>
                         {% endfor %}
 
                         <aside class="note-panel" aria-labelledby="notePanelTitle">
@@ -782,6 +865,7 @@
             const notePanelWord = document.getElementById("notePanelWord");
             const noteStatus = document.getElementById("noteStatus");
             const saveNoteButton = document.getElementById("saveNote");
+            const pronounceButtons = Array.from(document.querySelectorAll(".pronounce-button"));
             const notesById = new Map(Object.entries({{ notes_by_id | tojson }}));
             const noteSaveChains = new Map();
             const dirtyNoteIds = new Set();
@@ -794,6 +878,7 @@
             }
 
             function setActiveCard(nextIndex) {
+                window.Reader3Speech.stop();
                 flushActiveNote();
                 cards[currentIndex].hidden = true;
                 cards[currentIndex].classList.remove("is-active");
@@ -910,8 +995,19 @@
             }
 
             cards.forEach((card) => {
-                card.addEventListener("click", () => {
+                card.addEventListener("click", (event) => {
+                    if (event.target instanceof HTMLElement && event.target.closest("button")) {
+                        return;
+                    }
                     flipCurrentCard();
+                });
+            });
+
+            pronounceButtons.forEach((button) => {
+                button.disabled = !window.Reader3Speech.isSupported();
+                button.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    window.Reader3Speech.speak(button.dataset.pronunciation || "");
                 });
             });
 
@@ -943,7 +1039,10 @@
                 saveNote(currentCard().dataset.wordId, noteTextarea.value);
             });
 
-            window.addEventListener("pagehide", flushActiveNote);
+            window.addEventListener("pagehide", () => {
+                flushActiveNote();
+                window.Reader3Speech.stop();
+            });
 
             deleteForm.addEventListener("submit", (event) => {
                 const word = currentCard().querySelector(".word").textContent.trim();
@@ -954,7 +1053,7 @@
 
             document.addEventListener("keydown", (event) => {
                 const tagName = document.activeElement && document.activeElement.tagName;
-                if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") {
+                if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || tagName === "BUTTON") {
                     return;
                 }
 
