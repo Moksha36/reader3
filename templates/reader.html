@@ -270,6 +270,11 @@
             cursor: help;
         }
 
+        .saved-word:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
         .pdf-page-host {
             --scale-factor: 1;
             --user-unit: 1;
@@ -666,7 +671,7 @@
         </div>
 
         <div class="reader-toast" id="reader-toast" role="status" aria-live="polite"></div>
-        <div class="meaning-tooltip" id="meaning-tooltip" role="tooltip" aria-hidden="true">
+        <div class="meaning-tooltip" id="meaning-tooltip" role="tooltip" aria-hidden="true" inert>
             <div class="meaning-tooltip-header">
                 <div class="meaning-tooltip-word" id="meaning-tooltip-word"></div>
                 <button
@@ -685,6 +690,7 @@
     </div>
 
     <script src="/static/speech.js"></script>
+    <script src="/static/reader_interactions.js"></script>
     <script>
         const body = document.body;
         const bookContent = document.getElementById("book-content");
@@ -973,6 +979,7 @@
                 mark.dataset.word = normalizeWord(entry.word);
                 mark.dataset.key = key;
                 mark.dataset.hasMeaning = savedWordEntries.get(key)?.meaning ? "true" : "false";
+                window.Reader3ReaderInteractions.makeSavedWordInteractive(mark, entry.word);
                 mark.style.left = (rect.left - hostRect.left) + "px";
                 mark.style.top = (rect.top - hostRect.top) + "px";
                 mark.style.width = rect.width + "px";
@@ -1089,6 +1096,7 @@
                     mark.dataset.key = key;
                     mark.dataset.hasMeaning = savedWordEntries.get(key)?.meaning ? "true" : "false";
                     mark.textContent = matchedWord;
+                    window.Reader3ReaderInteractions.makeSavedWordInteractive(mark, matchedWord);
                     fragment.appendChild(mark);
 
                     lastIndex = wordStart + matchedWord.length;
@@ -1141,7 +1149,7 @@
             meaningTooltipPronounce.dataset.pronunciation = word;
             meaningTooltipPronounce.disabled = !word || !window.Reader3Speech.isSupported();
             meaningTooltip.classList.add("visible");
-            meaningTooltip.setAttribute("aria-hidden", "false");
+            window.Reader3ReaderInteractions.setTooltipVisible(meaningTooltip, true);
             positionMeaningTooltip(target);
         }
 
@@ -1149,7 +1157,9 @@
             cancelMeaningTooltipHide();
             activeMeaningTarget = null;
             meaningTooltip.classList.remove("visible");
-            meaningTooltip.setAttribute("aria-hidden", "true");
+            window.Reader3ReaderInteractions.setTooltipVisible(meaningTooltip, false);
+            meaningTooltipPronounce.dataset.pronunciation = "";
+            meaningTooltipPronounce.disabled = true;
         }
 
         function scheduleMeaningTooltipHide() {
@@ -1413,8 +1423,19 @@
         });
         meaningTooltip.addEventListener("pointerenter", cancelMeaningTooltipHide);
         meaningTooltip.addEventListener("pointerleave", scheduleMeaningTooltipHide);
+        meaningTooltip.addEventListener("focusin", cancelMeaningTooltipHide);
+        meaningTooltip.addEventListener("focusout", (event) => {
+            const nextTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
+            if (nextTarget && (meaningTooltip.contains(nextTarget) || activeMeaningTarget?.contains(nextTarget))) {
+                return;
+            }
+            scheduleMeaningTooltipHide();
+        });
         bookContent.addEventListener("dblclick", selectPdfWordAtPoint);
         bookContent.addEventListener("pointerover", (event) => {
+            if (isPdf) {
+                return;
+            }
             const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
             if (!target || !bookContent.contains(target)) {
                 return;
@@ -1423,6 +1444,9 @@
             handleSavedWordPointerEnter(target);
         });
         bookContent.addEventListener("pointerout", (event) => {
+            if (isPdf) {
+                return;
+            }
             const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
             const nextTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
             if (
@@ -1434,6 +1458,55 @@
             }
 
             scheduleMeaningTooltipHide();
+        });
+        bookContent.addEventListener("pointermove", (event) => {
+            if (!isPdf) {
+                return;
+            }
+            if (event.buttons !== 0) {
+                scheduleMeaningTooltipHide();
+                return;
+            }
+
+            const target = window.Reader3ReaderInteractions.savedWordAtPoint(
+                document.querySelectorAll("#pdf-highlight-layer .saved-word"),
+                event.clientX,
+                event.clientY,
+            );
+            if (!target) {
+                if (activeMeaningTarget) {
+                    scheduleMeaningTooltipHide();
+                }
+                return;
+            }
+            if (target === activeMeaningTarget) {
+                cancelMeaningTooltipHide();
+                return;
+            }
+            handleSavedWordPointerEnter(target);
+        });
+        bookContent.addEventListener("focusin", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
+            if (target && bookContent.contains(target)) {
+                handleSavedWordPointerEnter(target);
+            }
+        });
+        bookContent.addEventListener("focusout", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
+            const nextTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
+            if (!target || (nextTarget && (meaningTooltip.contains(nextTarget) || nextTarget.closest?.(".saved-word")))) {
+                return;
+            }
+            scheduleMeaningTooltipHide();
+        });
+        bookContent.addEventListener("keydown", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest(".saved-word") : null;
+            if (!target || (event.key !== " " && event.key !== "Enter")) {
+                return;
+            }
+            event.preventDefault();
+            handleSavedWordPointerEnter(target);
+            meaningTooltipPronounce.focus();
         });
         window.addEventListener("scroll", hideMeaningTooltip, true);
         window.addEventListener("resize", hideMeaningTooltip);

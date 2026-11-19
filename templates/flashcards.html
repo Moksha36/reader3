@@ -675,6 +675,7 @@
         }
     </style>
     <script src="/static/speech.js"></script>
+    <script src="/static/flashcard_interactions.js"></script>
 </head>
 <body>
     <main class="shell">
@@ -731,7 +732,7 @@
                                             <div class="card-tip">Space or Enter to flip</div>
                                         </div>
                                     </article>
-                                    <article class="card-face card-back">
+                                    <article class="card-face card-back" inert>
                                         <div class="card-back-inner">
                                             <div class="card-meta">{{ entry.book_title }} · Explanation</div>
                                             <div class="word-with-pronunciation">
@@ -909,6 +910,7 @@
                 progressBar.style.width = `${(cardNumber / cards.length) * 100}%`;
                 prevCardButton.disabled = currentIndex === 0;
                 nextCardButton.disabled = currentIndex === cards.length - 1;
+                window.Reader3FlashcardInteractions.syncFaceInteractivity(card, isFlipped);
                 syncWordIds();
                 syncNotePanel();
             }
@@ -1052,8 +1054,11 @@
             });
 
             document.addEventListener("keydown", (event) => {
-                const tagName = document.activeElement && document.activeElement.tagName;
-                if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || tagName === "BUTTON") {
+                const tagName = event.target instanceof HTMLElement ? event.target.tagName : "";
+                if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") {
+                    return;
+                }
+                if (!window.Reader3FlashcardInteractions.shouldHandleGlobalShortcut(event)) {
                     return;
                 }
 

@@ -49,6 +49,9 @@ class FlashcardTemplateTests(unittest.TestCase):
         self.assertEqual(card.name, "div")
         self.assertEqual(card.get("role"), "button")
         self.assertEqual(card.get("tabindex"), "0")
+        self.assertIsNone(page.select_one(".card-front").get("inert"))
+        self.assertEqual(page.select_one(".card-back").get("inert"), "")
+        self.assertIsNotNone(page.find("script", src="/static/flashcard_interactions.js"))
         self.assertEqual(len(controls), 2)
         self.assertEqual(
             [control.get("data-pronunciation") for control in controls],
@@ -86,16 +89,19 @@ class ReaderTemplateTests(unittest.TestCase):
     def test_reader_tooltip_has_standalone_pronunciation_control(self):
         page = self.render_reader()
         speech_script = page.find("script", src="/static/speech.js")
+        interaction_script = page.find("script", src="/static/reader_interactions.js")
         tooltip = page.select_one("#meaning-tooltip")
         word = page.select_one("#meaning-tooltip-word")
         control = page.select_one("#meaning-tooltip-pronounce")
 
         self.assertIsNotNone(speech_script)
+        self.assertIsNotNone(interaction_script)
         self.assertIsNotNone(tooltip)
         self.assertIsNotNone(word)
         self.assertIsNotNone(control)
         self.assertEqual(control.name, "button")
         self.assertEqual(control.get("aria-label"), "Pronounce saved word")
+        self.assertEqual(tooltip.get("inert"), "")
         self.assertIsNone(control.find_parent(class_="saved-word"))
 
 
