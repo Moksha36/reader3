@@ -76,6 +76,7 @@ VOCABULARY_EXPLANATION_SYSTEM_PROMPT = (
     "Keep the second block title exactly as 'Context meaning'. "
     "Output valid HTML fragments only."
 )
+VOCABULARY_EXPORT_HEADER = ["word", "", "", "context meaning", "", "", "", "sentence"]
 
 VOCABULARY_ENTRY_SCHEMA = {
     "type": "object",
@@ -248,16 +249,16 @@ def extract_pronunciation(ai_explanation: str) -> str:
     return ""
 
 
-def vocabulary_export_row(word: str, ai_explanation: str) -> list[str]:
+def vocabulary_export_row(word: str, sentence: str, ai_explanation: str) -> list[str]:
     return [
         word,
         "",
         "",
-        extract_pronunciation(ai_explanation),
-        "",
-        "",
-        "",
         extract_context_meaning(ai_explanation),
+        "",
+        "",
+        "",
+        sentence,
     ]
 
 
@@ -1458,7 +1459,7 @@ async def export_vocabulary_download(book_id: Optional[str] = None):
             if safe_book_id:
                 cur.execute(
                     """
-                    SELECT word, ai_explanation
+                    SELECT word, sentence, ai_explanation
                     FROM new_words
                     WHERE book_id = %s
                     ORDER BY chapter_index ASC, created_at ASC, id ASC
@@ -1468,16 +1469,16 @@ async def export_vocabulary_download(book_id: Optional[str] = None):
             else:
                 cur.execute(
                     """
-                    SELECT word, ai_explanation
+                    SELECT word, sentence, ai_explanation
                     FROM new_words
                     ORDER BY book_id ASC, chapter_index ASC, created_at ASC, id ASC
                     """
                 )
             rows = cur.fetchall()
 
-    csv_rows = [["word", "", "", "pronunciation", "", "", "", "context meaning"]]
-    for word, ai_explanation in rows:
-        csv_rows.append(vocabulary_export_row(word, ai_explanation))
+    csv_rows = [VOCABULARY_EXPORT_HEADER]
+    for word, sentence, ai_explanation in rows:
+        csv_rows.append(vocabulary_export_row(word, sentence, ai_explanation))
 
     filename = f"{safe_book_id}_vocabulary_export.csv" if safe_book_id else "reader3_vocabulary_export.csv"
     return csv_response(csv_rows, filename)
@@ -1500,7 +1501,7 @@ async def export_vocabulary_chapter(book_id: str, chapter_index: int):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT word, ai_explanation
+                SELECT word, sentence, ai_explanation
                 FROM new_words
                 WHERE book_id = %s AND chapter_index = %s
                 ORDER BY created_at ASC, id ASC
@@ -1514,8 +1515,8 @@ async def export_vocabulary_chapter(book_id: str, chapter_index: int):
         [book.metadata.title],
         [display_location],
     ]
-    for word, ai_explanation in rows:
-        csv_rows.append(vocabulary_export_row(word, ai_explanation))
+    for word, sentence, ai_explanation in rows:
+        csv_rows.append(vocabulary_export_row(word, sentence, ai_explanation))
 
     location_slug = display_location.casefold().replace(" ", "_")
     filename = f"{safe_book_id}_{location_slug}_vocabulary_export.csv"

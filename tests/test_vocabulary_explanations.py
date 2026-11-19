@@ -1,3 +1,5 @@
+import csv
+import io
 import unittest
 from types import SimpleNamespace
 
@@ -58,6 +60,36 @@ class VocabularyExplanationTests(unittest.TestCase):
             server.extract_context_meaning(LEGACY_EXPLANATION),
             "A representative case used to explain an idea.",
         )
+
+
+class VocabularyExportTests(unittest.TestCase):
+    def test_export_header_and_row_use_context_column_four_and_sentence_column_eight(self):
+        expected_header = ["word", "", "", "context meaning", "", "", "", "sentence"]
+        sentence = 'The author said, "This is an example."\nThen continued.'
+
+        self.assertEqual(
+            getattr(server, "VOCABULARY_EXPORT_HEADER", None),
+            expected_header,
+        )
+        try:
+            row = server.vocabulary_export_row(
+                word="example",
+                sentence=sentence,
+                ai_explanation=LEGACY_EXPLANATION,
+            )
+        except TypeError as exc:
+            self.fail(f"vocabulary_export_row must accept the source sentence: {exc}")
+
+        self.assertEqual(len(row), 8)
+        self.assertEqual(row[0], "example")
+        self.assertEqual(row[3], "A representative case used to explain an idea.")
+        self.assertEqual(row[7], sentence)
+        self.assertNotIn("/ɪɡˈzæmpəl/", row)
+
+        response = server.csv_response([expected_header, row], "vocabulary.csv")
+        decoded_rows = list(csv.reader(io.StringIO(response.body.decode("utf-8-sig"))))
+        self.assertEqual(decoded_rows[1][7], sentence)
+        self.assertEqual(len(decoded_rows[1]), 8)
 
 
 if __name__ == "__main__":
